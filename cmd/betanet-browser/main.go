@@ -17,6 +17,7 @@ import (
 	fyne "fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/fxamacker/cbor/v2"
@@ -105,10 +106,74 @@ func main() {
 	// Tab bar
 	tabBar := container.NewHBox()
 
-	// Modern address bar with better styling
+	// Modern address bar with better styling and navigation
 	addressBar := widget.NewEntry()
-	addressBar.SetPlaceHolder("Enter site address (like example.bn or site ID)")
+	addressBar.SetPlaceHolder("🌐 Enter site address (like example.bn or site ID)")
 	addressBar.TextStyle = fyne.TextStyle{Bold: false}
+
+	// Navigation buttons
+	backBtn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
+		// TODO: Implement back navigation
+	})
+	backBtn.Disable() // Disable initially
+
+	forwardBtn := widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
+		// TODO: Implement forward navigation
+	})
+	forwardBtn.Disable() // Disable initially
+
+	refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
+		// TODO: Implement refresh
+	})
+
+	homeBtn := widget.NewButtonWithIcon("", theme.HomeIcon(), func() {
+		// Go to welcome page
+		if len(tabs) > 0 {
+			// Show welcome content
+			welcomeContent := `# 🌐 Welcome to Betanet Browser
+
+**Experience the decentralized web with complete multi-file websites**
+
+## 🚀 Getting Started
+
+### Browse by Site ID
+Enter a site ID in the address bar to browse a specific website.
+
+### Browse by Domain
+Use human-readable .bn domains like mysite.bn for easy navigation.
+
+### Search and Discover
+Explore the decentralized web and discover new content.
+
+## ✨ Features
+
+- **🌐 Multi-File Websites** - Complete websites with HTML, CSS, JavaScript, and images
+- **🔍 Smart Navigation** - Address bar with suggestions and history
+- **📚 Tab Management** - Multiple tabs for different sites
+- **🔒 Secure Browsing** - Cryptographic content verification
+- **🌍 Peer-to-Peer** - Direct content delivery without intermediaries
+- **📱 Responsive Design** - Beautiful interface that works on all devices
+
+---
+
+*Ready to explore the decentralized web? Enter a site ID or domain above to begin!*`
+
+			tabs[0].Content.ParseMarkdown(welcomeContent)
+			tabs[0].Title = "Welcome"
+			updateTabBar()
+		}
+	})
+
+	// Navigation bar with buttons and address bar
+	navBar := container.NewHBox(
+		backBtn,
+		forwardBtn,
+		refreshBtn,
+		homeBtn,
+		layout.NewSpacer(),
+		addressBar,
+		layout.NewSpacer(),
+	)
 
 	var currentNode *p2p.Node
 	var currentDB *store.Store

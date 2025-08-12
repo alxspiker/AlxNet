@@ -161,6 +161,15 @@ build_binaries() {
         exit 1
     fi
     
+    # Build betanet-network
+    log_info "Building betanet-network..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-network" ./cmd/betanet-network; then
+        log_success "betanet-network built successfully"
+    else
+        log_error "Failed to build betanet-network!"
+        exit 1
+    fi
+    
     # Build betanet-gui (requires Linux GUI dev libs)
     log_info "Building betanet-gui..."
     if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-gui" ./cmd/betanet-gui; then
@@ -176,13 +185,21 @@ build_binaries() {
     else
         log_warning "betanet-browser build failed (likely missing X11/OpenGL dev libs)."
     fi
+    
+    # Build betanet-dashboard (requires Linux GUI dev libs)
+    log_info "Building betanet-dashboard..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-dashboard" ./cmd/betanet-dashboard; then
+        log_success "betanet-dashboard built successfully"
+    else
+        log_warning "betanet-dashboard build failed (likely missing X11/OpenGL dev libs)."
+    fi
 }
 
 # Security audit of built binaries
 audit_binaries() {
     log_info "Auditing built binaries..."
     
-    for binary in betanet-node betanet-wallet betanet-gui betanet-browser; do
+    for binary in betanet-node betanet-wallet betanet-gui betanet-browser betanet-dashboard; do
         if [ -f "$OUT_DIR/$binary" ]; then
             log_info "Auditing $binary..."
             
@@ -221,7 +238,7 @@ generate_report() {
         echo "Build Flags: $SECURITY_FLAGS"
         echo ""
         echo "Binaries Built:"
-        for binary in betanet-node betanet-wallet betanet-gui betanet-browser; do
+        for binary in betanet-node betanet-wallet betanet-gui betanet-browser betanet-dashboard; do
             if [ -f "$OUT_DIR/$binary" ]; then
                 size=$(stat -c "%s" "$OUT_DIR/$binary")
                 echo "  $binary: $size bytes"
