@@ -7,6 +7,8 @@ import (
     "path/filepath"
     "strings"
     "time"
+    "bytes"
+    "path"
 
     "betanet/internal/core"
     "betanet/internal/p2p"
@@ -18,17 +20,37 @@ import (
     "fyne.io/fyne/v2/container"
     "fyne.io/fyne/v2/theme"
     "fyne.io/fyne/v2/widget"
+    "golang.org/x/net/html"
 )
+
+// WebsiteFile represents a file in a multi-file website
+type WebsiteFile struct {
+    Path        string // e.g., "styles/main.css", "scripts/app.js", "images/logo.png"
+    ContentCID  string
+    Content     []byte
+    MimeType    string
+    LastUpdated time.Time
+}
+
+// Website represents a complete multi-file website
+type Website struct {
+    ID          string
+    Files       map[string]*WebsiteFile // path -> file
+    MainHTML    *WebsiteFile            // index.html or main entry point
+    LastUpdated time.Time
+}
 
 // Tab represents a browser tab
 type Tab struct {
-    Title     string
-    Content   *widget.RichText
-    Address   string
-    IsActive  bool
+    Title         string
+    Content       *widget.RichText
+    ScrollContent *container.Scroll // Scrollable wrapper for the content
+    Address       string
+    IsActive      bool
+    Website       *Website
 }
 
-// Modern tabbed browser interface for decentralized web
+// Modern tabbed browser interface for decentralized web with multi-file website support
 
 func main() {
     // Parse command line arguments
@@ -44,7 +66,7 @@ func main() {
         fmt.Println("  ./bin/betanet-browser -data /tmp/node1   # Connect to existing node database")
         fmt.Println("  ./bin/betanet-browser -data temp/demo-node # Connect to demo node")
         fmt.Println("")
-        fmt.Println("The browser will start its own local node using the specified database.")
+        fmt.Println("The browser will start its own local network node using the specified database.")
         fmt.Println("This allows you to browse sites and domains registered in that database.")
         return
     }
@@ -95,17 +117,25 @@ func main() {
     var updateTabBar func()
     var closeTab func(int)
     var showSettingsTab func()
+    var loadWebsite func(string) *Website
+    var renderWebsite func(*Website, *Tab)
     
     // Function to create a new tab
     createNewTab := func(title string, address string) *Tab {
         content := widget.NewRichText()
         content.Wrapping = fyne.TextWrapWord
         
+        // Wrap the content in a scrollable container
+        scrollContent := container.NewScroll(content)
+        scrollContent.SetMinSize(fyne.NewSize(800, 600)) // Ensure minimum size for scrolling
+        
         tab := &Tab{
-            Title:   title,
-            Content: content,
-            Address: address,
-            IsActive: false,
+            Title:         title,
+            Content:       content,
+            ScrollContent: scrollContent,
+            Address:       address,
+            IsActive:      false,
+            Website:       nil,
         }
         
         tabs = append(tabs, tab)
@@ -124,8 +154,8 @@ func main() {
             currentTabIndex = index
             tabs[currentTabIndex].IsActive = true
             
-            // Update tab container
-            tabContainer.Objects = []fyne.CanvasObject{tabs[currentTabIndex].Content}
+            // Update tab container with scrollable content
+            tabContainer.Objects = []fyne.CanvasObject{tabs[currentTabIndex].ScrollContent}
             tabContainer.Refresh()
             
             // Update address bar
@@ -192,6 +222,310 @@ func main() {
     addNewTab := func(title string, address string) {
         createNewTab(title, address)
         switchToTab(len(tabs) - 1)
+    }
+    
+    // Function to determine MIME type from file extension
+    getMimeType := func(filename string) string {
+        ext := path.Ext(filename)
+        switch ext {
+        case ".html", ".htm":
+            return "text/html"
+        case ".css":
+            return "text/css"
+        case ".js":
+            return "application/javascript"
+        case ".png":
+            return "image/png"
+        case ".jpg", ".jpeg":
+            return "image/jpeg"
+        case ".gif":
+            return "image/gif"
+        case ".svg":
+            return "image/svg+xml"
+        case ".ico":
+            return "image/x-icon"
+        case ".json":
+            return "application/json"
+        case ".xml":
+            return "application/xml"
+        case ".txt":
+            return "text/plain"
+        case ".md":
+            return "text/markdown"
+        default:
+            return "application/octet-stream"
+        }
+    }
+    
+    // Function to extract file references from HTML
+    extractFileReferences := func(htmlContent []byte) []string {
+        var references []string
+        doc, err := html.Parse(bytes.NewReader(htmlContent))
+        if err != nil {
+            return references
+        }
+        
+        var traverse func(*html.Node)
+        traverse = func(n *html.Node) {
+            if n.Type == html.ElementNode {
+                switch n.Data {
+                case "link":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "href" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                case "script":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "src" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                case "img":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "src" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                case "video":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "src" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                case "audio":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "src" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                case "source":
+                    for _, attr := range n.Attr {
+                        if attr.Key == "src" {
+                            references = append(references, attr.Val)
+                        }
+                    }
+                }
+            }
+            for c := n.FirstChild; c != nil; c = c.NextSibling {
+                traverse(c)
+            }
+        }
+        traverse(doc)
+        
+        return references
+    }
+    
+    // Function to load a complete website
+    loadWebsite = func(siteID string) *Website {
+        if currentDB == nil {
+            return nil
+        }
+        
+        website := &Website{
+            ID:    siteID,
+            Files: make(map[string]*WebsiteFile),
+        }
+        
+        // First try to load as a multi-file website
+        if currentDB.HasWebsiteManifest(siteID) {
+            manifestBytes, err := currentDB.GetCurrentWebsiteManifest(siteID)
+            if err != nil {
+                fmt.Printf("BROWSER: Error loading website manifest: %v\n", err)
+                return nil
+            }
+            
+            var manifest core.WebsiteManifest
+            dec, _ := cbor.DecOptions{}.DecMode()
+            if err := dec.Unmarshal(manifestBytes, &manifest); err != nil {
+                fmt.Printf("BROWSER: Error unmarshaling website manifest: %v\n", err)
+                return nil
+            }
+            
+            fmt.Printf("BROWSER: Loading multi-file website with %d files\n", len(manifest.Files))
+            
+            // Load the main HTML file
+            mainFileRecordBytes, err := currentDB.GetFileRecordByPath(siteID, manifest.MainFile)
+            if err != nil {
+                fmt.Printf("BROWSER: Error loading main file record: %v\n", err)
+                return nil
+            }
+            
+            var mainFileRecord core.FileRecord
+            if err := dec.Unmarshal(mainFileRecordBytes, &mainFileRecord); err != nil {
+                fmt.Printf("BROWSER: Error unmarshaling main file record: %v\n", err)
+                return nil
+            }
+            
+            mainContent, err := currentDB.GetContent(mainFileRecord.ContentCID)
+            if err != nil {
+                fmt.Printf("BROWSER: Error loading main file content: %v\n", err)
+                return nil
+            }
+            
+            // Create main HTML file
+            mainFile := &WebsiteFile{
+                Path:       manifest.MainFile,
+                ContentCID: mainFileRecord.ContentCID,
+                Content:    mainContent,
+                MimeType:   mainFileRecord.MimeType,
+                LastUpdated: time.Unix(mainFileRecord.TS, 0),
+            }
+            website.MainHTML = mainFile
+            website.Files[manifest.MainFile] = mainFile
+            
+            // Load all referenced files
+            for filePath, contentCID := range manifest.Files {
+                if filePath == manifest.MainFile {
+                    continue // Already loaded
+                }
+                
+                fileRecordBytes, err := currentDB.GetFileRecordByPath(siteID, filePath)
+                if err != nil {
+                    fmt.Printf("BROWSER: Error loading file record for %s: %v\n", filePath, err)
+                    continue
+                }
+                
+                var fileRecord core.FileRecord
+                if err := dec.Unmarshal(fileRecordBytes, &fileRecord); err != nil {
+                    fmt.Printf("BROWSER: Error unmarshaling file record for %s: %v\n", filePath, err)
+                    continue
+                }
+                
+                fileContent, err := currentDB.GetContent(contentCID)
+                if err != nil {
+                    fmt.Printf("BROWSER: Error loading file content for %s: %v\n", filePath, err)
+                    continue
+                }
+                
+                websiteFile := &WebsiteFile{
+                    Path:       filePath,
+                    ContentCID: contentCID,
+                    Content:    fileContent,
+                    MimeType:   fileRecord.MimeType,
+                    LastUpdated: time.Unix(fileRecord.TS, 0),
+                }
+                website.Files[filePath] = websiteFile
+            }
+            
+            return website
+        }
+        
+        // Fall back to single-file website (legacy support)
+        _, headCID, err := currentDB.GetHead(siteID)
+        if err != nil {
+            return nil
+        }
+        
+        recBytes, err := currentDB.GetRecord(headCID)
+        if err != nil {
+            return nil
+        }
+        
+        var rec core.UpdateRecord
+        dec, _ := cbor.DecOptions{}.DecMode()
+        if err := dec.Unmarshal(recBytes, &rec); err != nil {
+            return nil
+        }
+        
+        // Load main content
+        mainContent, err := currentDB.GetContent(rec.ContentCID)
+        if err != nil {
+            return nil
+        }
+        
+        // Determine if this is HTML content
+        contentStr := string(mainContent)
+        if strings.Contains(contentStr, "<html") || strings.Contains(contentStr, "<!DOCTYPE") {
+            // This is an HTML file - treat as main entry point
+            mainFile := &WebsiteFile{
+                Path:       "index.html",
+                ContentCID: rec.ContentCID,
+                Content:    mainContent,
+                MimeType:   "text/html",
+                LastUpdated: time.Now(),
+            }
+            website.MainHTML = mainFile
+            website.Files["index.html"] = mainFile
+            
+            // Extract file references and load them
+            references := extractFileReferences(mainContent)
+            for _, ref := range references {
+                // For now, we'll look for files with the same name in the database
+                // In a full implementation, these would be separate blockchain transactions
+                fmt.Printf("BROWSER: Found reference to file: %s\n", ref)
+                
+                // TODO: Implement loading of referenced files from blockchain
+                // This would involve:
+                // 1. Looking up file transactions by path/name
+                // 2. Loading their content
+                // 3. Adding them to the website.Files map
+            }
+        } else {
+            // This is not HTML - treat as single file content
+            mainFile := &WebsiteFile{
+                Path:       "content",
+                ContentCID: rec.ContentCID,
+                Content:    mainContent,
+                MimeType:   getMimeType(siteID),
+                LastUpdated: time.Now(),
+            }
+            website.Files["content"] = mainFile
+        }
+        
+        return website
+    }
+    
+    // Function to render a website in a tab
+    renderWebsite = func(website *Website, tab *Tab) {
+        if website == nil || website.MainHTML == nil {
+            // Not an HTML website, show as text
+            if len(website.Files) > 0 {
+                for _, file := range website.Files {
+                    tab.Content.ParseMarkdown("# " + tab.Address + "\n\n```\n" + string(file.Content) + "\n```")
+                    break
+                }
+            }
+            return
+        }
+        
+        // For now, we'll show HTML content in the rich text widget
+        // In a full implementation, this would use webview for proper rendering
+        htmlContent := string(website.MainHTML.Content)
+        
+        // Create a formatted display of the HTML content
+        displayContent := fmt.Sprintf(`# %s
+
+## 🌐 Multi-file Website Loaded
+
+**Files Found:** %d
+
+### HTML Content Preview:
+` + "```" + `html
+%s
+` + "```" + `
+
+### Referenced Files:
+%s
+
+*Note: This is a preview. Full HTML rendering with CSS/JS support is coming soon.*`, 
+            tab.Address, 
+            len(website.Files),
+            htmlContent,
+            func() string {
+                if len(website.Files) > 1 {
+                    var fileList []string
+                    for path := range website.Files {
+                        if path != "index.html" {
+                            fileList = append(fileList, "- " + path)
+                        }
+                    }
+                    return strings.Join(fileList, "\n")
+                }
+                return "*No additional files found*"
+            }())
+        
+        tab.Content.ParseMarkdown(displayContent)
     }
     
     // Helper function to check if string is hex
@@ -262,7 +596,7 @@ func main() {
         }
         
         if err := node.Start(ctx); err != nil {
-            fmt.Printf("BROWSER: Local node start failed: %v\n", err)
+            fmt.Printf("BROWSER: Local node creation failed: %v\n", err)
             if len(tabs) > 0 {
                 tabs[0].Content.ParseMarkdown("# Network Error\n\nCould not start local network node.")
             }
@@ -286,12 +620,18 @@ The browser has started its own local network node on port 4001.
 2. Click "Go" or press Enter
 3. The site content will load below
 
+### Multi-file Website Support:
+- **HTML Files**: Main entry points with HTML preview
+- **CSS & JavaScript**: Styles and interactive functionality (coming soon)
+- **Images & Assets**: Visual content and media files (coming soon)
+- **Blockchain Storage**: Each file stored as separate transaction
+
 ### To connect to other networks:
 - Start another betanet-node on a different port
 - The browser will automatically discover it via mDNS
 - Or manually enter the node address
 
-*This browser works like Chrome, but for decentralized websites.*`)
+*This browser works like Chrome, but for decentralized websites with multi-file support.*`)
         }
     }
     
@@ -350,6 +690,11 @@ The browser has started its own local network node on port 4001.
 - **Current Node**: ` + fmt.Sprintf("%v", currentNode != nil) + `
 - **Database**: ` + fmt.Sprintf("%v", currentDB != nil) + `
 
+### Multi-file Website Support
+- **HTML Rendering**: Basic HTML preview (webview coming soon)
+- **Asset Loading**: CSS, JavaScript, images from blockchain (coming soon)
+- **File References**: Automatic detection and loading
+
 ### Advanced Options
 - **Node Port**: 4001
 - **Discovery**: mDNS enabled
@@ -395,61 +740,37 @@ The browser has started its own local network node on port 4001.
             tabs[currentTabIndex].Content.ParseMarkdown("# Loading...\n\nSearching for site: " + siteID)
         }
         
-        // Try to get site from local database
-        if has, _ := currentDB.HasHead(siteID); !has {
+        // Try to get site from local database (check for multi-file websites first)
+        hasMultiFile := currentDB.HasWebsiteManifest(siteID)
+        hasSingleFile, _ := currentDB.HasHead(siteID)
+        
+        if !hasMultiFile && !hasSingleFile {
             if len(tabs) > 0 && currentTabIndex < len(tabs) {
                 tabs[currentTabIndex].Content.ParseMarkdown("# Site Not Found\n\nSite **" + siteID + "** is not available in the local cache.\n\nThis could mean:\n- The site doesn't exist\n- The site hasn't been published to this network\n- The site hasn't been cached locally yet\n\n*In a full implementation, this would attempt to fetch from the network.*")
             }
             return
         }
         
-        // Get site content
-        seq, headCID, err := currentDB.GetHead(siteID)
-        if err != nil {
+        // Load the complete website
+        website := loadWebsite(siteID)
+        if website == nil {
             if len(tabs) > 0 && currentTabIndex < len(tabs) {
-                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site: " + err.Error())
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load website: " + siteID)
             }
             return
         }
         
-        recBytes, err := currentDB.GetRecord(headCID)
-        if err != nil {
-            if len(tabs) > 0 && currentTabIndex < len(tabs) {
-                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site record: " + err.Error())
-            }
-            return
-        }
-        
-        var rec core.UpdateRecord
-        dec, _ := cbor.DecOptions{}.DecMode()
-        if err := dec.Unmarshal(recBytes, &rec); err != nil {
-            if len(tabs) > 0 && currentTabIndex < len(tabs) {
-                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to parse site record: " + err.Error())
-            }
-            return
-        }
-        
-        content, err := currentDB.GetContent(rec.ContentCID)
-        if err != nil {
-            if len(tabs) > 0 && currentTabIndex < len(tabs) {
-                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site content: " + err.Error())
-            }
-            return
-        }
-        
-        // Display the content
-        fmt.Printf("BROWSER: Loaded site %s (seq %d) with %d bytes\n", siteID, seq, len(content))
-        
-        // If it looks like HTML, show it as-is, otherwise show as markdown
-        contentStr := string(content)
+        // Store website in current tab
         if len(tabs) > 0 && currentTabIndex < len(tabs) {
-            if strings.Contains(contentStr, "<html>") || strings.Contains(contentStr, "<h1>") {
-                // Show HTML content as markdown for now (basic rendering)
-                tabs[currentTabIndex].Content.ParseMarkdown("# " + cleanAddr + "\n\n```html\n" + contentStr + "\n```")
-            } else {
-                // Show as markdown (use the original address for title)
-                tabs[currentTabIndex].Content.ParseMarkdown("# " + cleanAddr + "\n\n" + contentStr)
-            }
+            tabs[currentTabIndex].Website = website
+        }
+        
+        // Display the website
+        fmt.Printf("BROWSER: Loaded website %s with %d files\n", siteID, len(website.Files))
+        
+        // Render the website
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            renderWebsite(website, tabs[currentTabIndex])
         }
     }
 
@@ -488,8 +809,8 @@ The browser has started its own local network node on port 4001.
     currentTabIndex = 0
     tabs[0].IsActive = true
     
-    // Set initial tab content
-    tabContainer.Objects = []fyne.CanvasObject{initialTab.Content}
+    // Set initial tab content with scrollable wrapper
+    tabContainer.Objects = []fyne.CanvasObject{initialTab.ScrollContent}
     
     // Update tab bar
     updateTabBar()

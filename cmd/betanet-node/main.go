@@ -9,6 +9,7 @@ import (
     "fmt"
     "log"
     "os"
+    "path/filepath"
     "strings"
     "time"
 
@@ -21,6 +22,7 @@ import (
     "github.com/fxamacker/cbor/v2"
     peer "github.com/libp2p/go-libp2p/core/peer"
     ma "github.com/multiformats/go-multiaddr"
+    "encoding/json"
 )
 
 func main() {
@@ -47,6 +49,14 @@ func main() {
         deleteCmd()
     case "browse":
         browse()
+    case "publish-website":
+        publishWebsite()
+    case "add-file":
+        addFile()
+    case "list-website":
+        listWebsite()
+    case "get-website-info":
+        getWebsiteInfo()
     default:
         usage()
     }
@@ -62,6 +72,12 @@ func usage() {
     fmt.Println("  get-content -data /path/db -contentCID <hex> [-out FILE] [-decrypt-pass \"...\"]")
     fmt.Println("  delete -key /path/key.b64 -data /path/db [-recCID <hex>] [-contentCID <hex>]")
     fmt.Println("  browse -data /path/db -site <siteID> [-listen MA] [-bootstrap MA[,MA...]] [-out FILE] [-decrypt-pass \"...\"]")
+    fmt.Println("")
+    fmt.Println("Multi-file Website Commands:")
+    fmt.Println("  publish-website -key /path/key.b64 -data /path/db -dir /path/website [-main index.html] [-bootstrap ...]")
+    fmt.Println("  add-file -key /path/key.b64 -data /path/db -path <filepath> -content /path/file [-bootstrap ...]")
+    fmt.Println("  list-website -data /path/db -site <siteID>")
+    fmt.Println("  get-website-info -data /path/db -site <siteID>")
 }
 
 func initKey() {
@@ -98,6 +114,8 @@ func runNode() {
             fmt.Printf("addr: %s/p2p/%s\n", a.String(), pid)
         }
     }
+
+    // Keep node running
     select {}
 }
 
@@ -406,6 +424,303 @@ func browse() {
     fmt.Printf("Wrote %s (%d bytes)\n", *out, len(content))
 }
 
-// no extra helpers
+// publishWebsite publishes a complete multi-file website
+func publishWebsite() {
+    fs := flag.NewFlagSet("publish-website", flag.ExitOnError)
+    keyPath := fs.String("key", "", "path to base64 ed25519 private key")
+    data := fs.String("data", "./data", "data directory")
+    websiteDir := fs.String("dir", "", "path to website directory")
+    mainFile := fs.String("main", "index.html", "main entry point file")
+    bootstrap := fs.String("bootstrap", "", "comma-separated peer multiaddrs")
+    _ = fs.Parse(os.Args[2:])
+
+    if *keyPath == "" || *websiteDir == "" {
+        log.Fatal("key and dir are required")
+    }
+
+    // Load private key
+    keyData, err := os.ReadFile(*keyPath)
+    if err != nil { log.Fatal(err) }
+    privBytes, err := base64.StdEncoding.DecodeString(string(keyData))
+    if err != nil { log.Fatal(err) }
+    priv := ed25519.PrivateKey(privBytes)
+    pub := priv.Public().(ed25519.PublicKey)
+
+    // Open database
+    db, err := store.Open(*data)
+    if err != nil { log.Fatal(err) }
+    defer db.Close()
+
+    // Check if main file exists
+    mainFilePath := filepath.Join(*websiteDir, *mainFile)
+    if _, err := os.Stat(mainFilePath); os.IsNotExist(err) {
+        log.Fatalf("Main file %s does not exist", mainFilePath)
+    }
+
+    // Start node for publishing
+    ctx := context.Background()
+    var node *p2p.Node
+    if *bootstrap != "" {
+        node, err = p2p.New(ctx, db, "/ip4/0.0.0.0/tcp/0", strings.Split(*bootstrap, ","))
+        if err != nil { log.Fatal(err) }
+        if err := node.Start(ctx); err != nil { log.Fatal(err) }
+        defer node.Host.Close()
+    }
+
+    // Create website manifest
+    manifest := &core.WebsiteManifest{
+        Version:   "1.0",
+        SitePub:   pub,
+        Seq:       1,
+        PrevCID:   "",
+        TS:        core.NowTS(),
+        MainFile:  *mainFile,
+        Files:     make(map[string]string),
+    }
+
+    // Process all files in the website directory
+    err = filepath.Walk(*websiteDir, func(path string, info os.FileInfo, err error) error {
+        if err != nil { return err }
+        if info.IsDir() { return nil }
+
+        // Get relative path from website directory
+        relPath, err := filepath.Rel(*websiteDir, path)
+        if err != nil { return err }
+
+        // Read file content
+        content, err := os.ReadFile(path)
+        if err != nil { return err }
+
+        // Generate content CID
+        contentCID := core.CIDForContent(content)
+        
+        // Store content
+        if err := db.PutContent(contentCID, content); err != nil {
+            return fmt.Errorf("failed to store content for %s: %v", relPath, err)
+        }
+
+        // Create file record
+        fileRecord := &core.FileRecord{
+            Version:    "1.0",
+            SitePub:    pub,
+            Path:       relPath,
+            ContentCID: contentCID,
+            MimeType:   core.GetMimeType(relPath),
+            TS:         core.NowTS(),
+        }
+
+        // Generate ephemeral key for this file
+        fileUpdatePub, fileUpdatePriv, err := bncrypto.GenerateSiteKey()
+        if err != nil { return err }
+        fileRecord.UpdatePub = fileUpdatePub
+
+        // Sign file record
+        fileRecordData, err := core.CanonicalMarshalFileRecordNoUpdateSig(fileRecord)
+        if err != nil { return err }
+        fileRecord.UpdateSig = ed25519.Sign(fileUpdatePriv, fileRecordData)
+
+        // Store file record
+        fileRecordCID := core.CIDForBytes(fileRecordData)
+        if err := db.PutRecord(fileRecordCID, fileRecordData); err != nil {
+            return fmt.Errorf("failed to store file record for %s: %v", relPath, err)
+        }
+
+        // Add to manifest
+        manifest.Files[relPath] = contentCID
+
+        fmt.Printf("Processed file: %s (CID: %s)\n", relPath, contentCID)
+        return nil
+    })
+
+    if err != nil { log.Fatal(err) }
+
+    // Generate ephemeral key for manifest
+    manifestUpdatePub, manifestUpdatePriv, err := bncrypto.GenerateSiteKey()
+    if err != nil { log.Fatal(err) }
+    manifest.UpdatePub = manifestUpdatePub
+
+    // Sign manifest
+    manifestData, err := core.CanonicalMarshalWebsiteManifestNoUpdateSig(manifest)
+    if err != nil { log.Fatal(err) }
+    manifest.UpdateSig = ed25519.Sign(manifestUpdatePriv, manifestData)
+
+    // Store manifest
+    manifestCID := core.CIDForBytes(manifestData)
+    if err := db.PutRecord(manifestCID, manifestData); err != nil {
+        log.Fatal("failed to store manifest record")
+    }
+
+    // Store website manifest in store
+    siteID := core.SiteIDFromPub(pub)
+    if err := db.PutWebsiteManifest(siteID, manifestCID, manifestData); err != nil {
+        log.Fatal("failed to store website manifest")
+    }
+
+    fmt.Printf("\nWebsite published successfully!\n")
+    fmt.Printf("Site ID: %s\n", siteID)
+    fmt.Printf("Main file: %s\n", *mainFile)
+    fmt.Printf("Total files: %d\n", len(manifest.Files))
+    fmt.Printf("Manifest CID: %s\n", manifestCID)
+}
+
+// addFile adds a single file to an existing website
+func addFile() {
+    fs := flag.NewFlagSet("add-file", flag.ExitOnError)
+    keyPath := fs.String("key", "", "path to base64 ed25519 private key")
+    data := fs.String("data", "./data", "data directory")
+    filePath := fs.String("path", "", "file path within website (e.g., styles/main.css)")
+    contentPath := fs.String("content", "", "path to file content")
+    _ = fs.Parse(os.Args[2:])
+
+    if *keyPath == "" || *filePath == "" || *contentPath == "" {
+        log.Fatal("key, path, and content are required")
+    }
+
+    // Load private key
+    keyData, err := os.ReadFile(*keyPath)
+    if err != nil { log.Fatal(err) }
+    privBytes, err := base64.StdEncoding.DecodeString(string(keyData))
+    if err != nil { log.Fatal(err) }
+    priv := ed25519.PrivateKey(privBytes)
+    pub := priv.Public().(ed25519.PublicKey)
+
+    // Open database
+    db, err := store.Open(*data)
+    if err != nil { log.Fatal(err) }
+    defer db.Close()
+
+    // Read file content
+    content, err := os.ReadFile(*contentPath)
+    if err != nil { log.Fatal(err) }
+
+    // Generate content CID
+    contentCID := core.CIDForContent(content)
+    
+    // Store content
+    if err := db.PutContent(contentCID, content); err != nil {
+        log.Fatal("failed to store content")
+    }
+
+    // Create file record
+    fileRecord := &core.FileRecord{
+        Version:    "1.0",
+        SitePub:    pub,
+        Path:       *filePath,
+        ContentCID: contentCID,
+        MimeType:   core.GetMimeType(*filePath),
+        TS:         core.NowTS(),
+    }
+
+    // Generate ephemeral key for this file
+    fileUpdatePub, fileUpdatePriv, err := bncrypto.GenerateSiteKey()
+    if err != nil { log.Fatal(err) }
+    fileRecord.UpdatePub = fileUpdatePub
+
+    // Sign file record
+    fileRecordData, err := core.CanonicalMarshalFileRecordNoUpdateSig(fileRecord)
+    if err != nil { log.Fatal(err) }
+    fileRecord.UpdateSig = ed25519.Sign(fileUpdatePriv, fileRecordData)
+
+    // Store file record
+    fileRecordCID := core.CIDForBytes(fileRecordData)
+    if err := db.PutRecord(fileRecordCID, fileRecordData); err != nil {
+        log.Fatal("failed to store file record")
+    }
+
+    // Store file record in store
+    siteID := core.SiteIDFromPub(pub)
+    if err := db.PutFileRecord(siteID, *filePath, fileRecordCID, fileRecordData); err != nil {
+        log.Fatal("failed to store file record")
+    }
+
+    fmt.Printf("File added successfully!\n")
+    fmt.Printf("Site ID: %s\n", siteID)
+    fmt.Printf("File path: %s\n", *filePath)
+    fmt.Printf("Content CID: %s\n", contentCID)
+    fmt.Printf("Record CID: %s\n", fileRecordCID)
+}
+
+// listWebsite lists all files in a website
+func listWebsite() {
+    fs := flag.NewFlagSet("list-website", flag.ExitOnError)
+    data := fs.String("data", "./data", "data directory")
+    siteID := fs.String("site", "", "site ID to list")
+    _ = fs.Parse(os.Args[2:])
+
+    if *siteID == "" {
+        log.Fatal("site is required")
+    }
+
+    // Open database
+    db, err := store.Open(*data)
+    if err != nil { log.Fatal(err) }
+    defer db.Close()
+
+    // Check if it's a multi-file website
+    if db.HasWebsiteManifest(*siteID) {
+        // Get website info
+        info, err := db.GetWebsiteInfo(*siteID)
+        if err != nil { log.Fatal(err) }
+
+        fmt.Printf("Website: %s\n", *siteID)
+        fmt.Printf("Main file: %s\n", info.MainFile)
+        fmt.Printf("Total files: %d\n", info.FileCount)
+        fmt.Printf("Last updated: %s\n", info.LastUpdated.Format(time.RFC3339))
+        fmt.Printf("\nFiles:\n")
+        
+        for path, fileInfo := range info.Files {
+            fmt.Printf("  %s (%s, %d bytes, %s)\n", 
+                path, fileInfo.MimeType, fileInfo.Size, 
+                fileInfo.LastUpdated.Format(time.RFC3339))
+        }
+    } else {
+        // Check if it's a traditional single-file site
+        hasHead, err := db.HasHead(*siteID)
+        if err != nil { log.Fatal(err) }
+        
+        if hasHead {
+            seq, headCID, err := db.GetHead(*siteID)
+            if err != nil { log.Fatal(err) }
+            
+            fmt.Printf("Single-file site: %s\n", *siteID)
+            fmt.Printf("Sequence: %d\n", seq)
+            fmt.Printf("Head CID: %s\n", headCID)
+        } else {
+            fmt.Printf("Site %s not found\n", *siteID)
+        }
+    }
+}
+
+// getWebsiteInfo gets detailed information about a website
+func getWebsiteInfo() {
+    fs := flag.NewFlagSet("get-website-info", flag.ExitOnError)
+    data := fs.String("data", "./data", "data directory")
+    siteID := fs.String("site", "", "site ID to get info for")
+    _ = fs.Parse(os.Args[2:])
+
+    if *siteID == "" {
+        log.Fatal("site is required")
+    }
+
+    // Open database
+    db, err := store.Open(*data)
+    if err != nil { log.Fatal(err) }
+    defer db.Close()
+
+    // Check if it's a multi-file website
+    if db.HasWebsiteManifest(*siteID) {
+        // Get website info
+        info, err := db.GetWebsiteInfo(*siteID)
+        if err != nil { log.Fatal(err) }
+
+        // Convert to JSON for pretty printing
+        jsonData, err := json.MarshalIndent(info, "", "  ")
+        if err != nil { log.Fatal(err) }
+
+        fmt.Printf("Website Information:\n%s\n", string(jsonData))
+    } else {
+        fmt.Printf("Site %s is not a multi-file website\n", *siteID)
+    }
+}
 
 

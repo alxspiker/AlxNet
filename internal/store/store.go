@@ -2,13 +2,17 @@ package store
 
 import (
     "bytes"
-    "encoding/json"
     "errors"
+    "fmt"
     "path/filepath"
+    "strconv"
     "strings"
     "time"
 
+    "betanet/internal/core"
+
     "github.com/dgraph-io/badger/v4"
+    "github.com/fxamacker/cbor/v2"
 )
 
 type Store struct {
@@ -90,7 +94,7 @@ func (s *Store) GetContent(cid string) ([]byte, error) {
     err := s.db.View(func(txn *badger.Txn) error {
         it, err := txn.Get([]byte("content:" + cid))
         if err != nil {
-            return err
+            return nil
         }
         return it.Value(func(v []byte) error {
             out = append([]byte{}, v...)
@@ -104,6 +108,272 @@ func (s *Store) DeleteContent(cid string) error {
     return s.db.Update(func(txn *badger.Txn) error {
         return txn.Delete([]byte("content:" + cid))
     })
+}
+
+// Multi-file website support methods
+
+// PutWebsiteManifest stores a website manifest
+func (s *Store) PutWebsiteManifest(siteID string, manifestCID string, data []byte) error {
+    return s.db.Update(func(txn *badger.Txn) error {
+        // Store the manifest data
+        if err := txn.Set([]byte("manifest:"+manifestCID), data); err != nil {
+            return err
+        }
+        // Update the site's current manifest pointer
+        return txn.Set([]byte("site:"+siteID+":manifest"), []byte(manifestCID))
+    })
+}
+
+// GetWebsiteManifest retrieves a website manifest by CID
+func (s *Store) GetWebsiteManifest(manifestCID string) ([]byte, error) {
+    var out []byte
+    err := s.db.View(func(txn *badger.Txn) error {
+        it, err := txn.Get([]byte("manifest:" + manifestCID))
+        if err != nil {
+            return err
+        }
+        return it.Value(func(v []byte) error {
+            out = append([]byte{}, v...)
+            return nil
+        })
+    })
+    return out, err
+}
+
+// GetCurrentWebsiteManifest retrieves the current manifest for a site
+func (s *Store) GetCurrentWebsiteManifest(siteID string) ([]byte, error) {
+    var manifestCID []byte
+    err := s.db.View(func(txn *badger.Txn) error {
+        it, err := txn.Get([]byte("site:" + siteID + ":manifest"))
+        if err != nil {
+            return err
+        }
+        return it.Value(func(v []byte) error {
+            manifestCID = append([]byte{}, v...)
+            return nil
+        })
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return s.GetWebsiteManifest(string(manifestCID))
+}
+
+// PutFileRecord stores a file record for a website
+func (s *Store) PutFileRecord(siteID string, filePath string, recordCID string, data []byte) error {
+    return s.db.Update(func(txn *badger.Txn) error {
+        // Store the file record data
+        if err := txn.Set([]byte("filerecord:"+recordCID), data); err != nil {
+            return err
+        }
+        // Store the file path -> record CID mapping
+        if err := txn.Set([]byte("site:"+siteID+":file:"+filePath), []byte(recordCID)); err != nil {
+            return err
+        }
+        return nil
+    })
+}
+
+// GetFileRecord retrieves a file record by CID
+func (s *Store) GetFileRecord(recordCID string) ([]byte, error) {
+    var out []byte
+    err := s.db.View(func(txn *badger.Txn) error {
+        it, err := txn.Get([]byte("filerecord:" + recordCID))
+        if err != nil {
+            return err
+        }
+        return it.Value(func(v []byte) error {
+            out = append([]byte{}, v...)
+            return nil
+        })
+    })
+    return out, err
+}
+
+// GetFileRecordByPath retrieves a file record for a specific file path in a website
+func (s *Store) GetFileRecordByPath(siteID string, filePath string) ([]byte, error) {
+    var recordCID []byte
+    err := s.db.View(func(txn *badger.Txn) error {
+        it, err := txn.Get([]byte("site:" + siteID + ":file:" + filePath))
+        if err != nil {
+            return err
+        }
+        return it.Value(func(v []byte) error {
+            recordCID = append([]byte{}, v...)
+            return nil
+        })
+    })
+    if err != nil {
+        return nil, err
+    }
+    
+    return s.GetFileRecord(string(recordCID))
+}
+
+// ListWebsiteFiles lists all files in a website
+func (s *Store) ListWebsiteFiles(siteID string) (map[string]string, error) {
+    files := make(map[string]string)
+    err := s.db.View(func(txn *badger.Txn) error {
+        opts := badger.DefaultIteratorOptions
+        opts.PrefetchValues = false
+        it := txn.NewIterator(opts)
+        defer it.Close()
+        
+        prefix := []byte("site:" + siteID + ":file:")
+        for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+            item := it.Item()
+            k := string(item.Key())
+            // Extract file path from key "site:siteID:file:path"
+            parts := strings.SplitN(k, ":", 4)
+            if len(parts) == 4 {
+                filePath := parts[3]
+                var recordCID []byte
+                err := item.Value(func(v []byte) error {
+                    recordCID = append([]byte{}, v...)
+                    return nil
+                })
+                if err == nil {
+                    files[filePath] = string(recordCID)
+                }
+            }
+        }
+        return nil
+    })
+    return files, err
+}
+
+// GetWebsiteInfo retrieves comprehensive information about a website
+func (s *Store) GetWebsiteInfo(siteID string) (*core.WebsiteInfo, error) {
+    // Get current manifest
+    manifestData, err := s.GetCurrentWebsiteManifest(siteID)
+    if err != nil {
+        return nil, err
+    }
+    
+    // Parse manifest
+    var manifest core.WebsiteManifest
+    dec, _ := cbor.DecOptions{}.DecMode()
+    if err := dec.Unmarshal(manifestData, &manifest); err != nil {
+        return nil, err
+    }
+    
+    // Get file information
+    files := make(map[string]core.WebsiteFileInfo)
+    for filePath, contentCID := range manifest.Files {
+        // Get file record
+        fileRecordData, err := s.GetFileRecordByPath(siteID, filePath)
+        if err != nil {
+            continue // Skip files we can't read
+        }
+        
+        var fileRecord core.FileRecord
+        if err := dec.Unmarshal(fileRecordData, &fileRecord); err != nil {
+            continue
+        }
+        
+        // Get content size
+        content, err := s.GetContent(contentCID)
+        var size int64
+        if err == nil {
+            size = int64(len(content))
+        }
+        
+        files[filePath] = core.WebsiteFileInfo{
+            Path:        filePath,
+            ContentCID:  contentCID,
+            MimeType:    fileRecord.MimeType,
+            Size:        size,
+            LastUpdated: time.Unix(fileRecord.TS, 0),
+        }
+    }
+    
+    return &core.WebsiteInfo{
+        SiteID:      siteID,
+        MainFile:    manifest.MainFile,
+        Files:       files,
+        FileCount:   len(files),
+        LastUpdated: time.Unix(manifest.TS, 0),
+    }, nil
+}
+
+// Check if a site has a website manifest (multi-file website)
+func (s *Store) HasWebsiteManifest(siteID string) bool {
+    err := s.db.View(func(txn *badger.Txn) error {
+        _, err := txn.Get([]byte("site:" + siteID + ":manifest"))
+        return err
+    })
+    return err == nil
+}
+
+// Check if a site has a traditional single-file record
+func (s *Store) HasHead(siteID string) (bool, error) {
+    var found bool
+    err := s.db.View(func(txn *badger.Txn) error {
+        opts := badger.DefaultIteratorOptions
+        opts.PrefetchValues = false
+        it := txn.NewIterator(opts)
+        defer it.Close()
+        
+        prefix := []byte("site:" + siteID + ":head:")
+        for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+            found = true
+            break
+        }
+        return nil
+    })
+    return found, err
+}
+
+// GetHead retrieves the current head for a traditional single-file site
+func (s *Store) GetHead(siteID string) (uint64, string, error) {
+    var seq uint64
+    var headCID string
+    err := s.db.View(func(txn *badger.Txn) error {
+        opts := badger.DefaultIteratorOptions
+        opts.PrefetchValues = false
+        it := txn.NewIterator(opts)
+        defer it.Close()
+        
+        prefix := []byte("site:" + siteID + ":head:")
+        for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+            item := it.Item()
+            k := string(item.Key())
+            // Extract sequence from key "site:siteID:head:seq"
+            parts := strings.SplitN(k, ":", 4)
+            if len(parts) == 4 {
+                if seqStr := parts[3]; seqStr != "" {
+                    if seqNum, err := strconv.ParseUint(seqStr, 10, 64); err == nil {
+                        seq = seqNum
+                    }
+                }
+            }
+            
+            // Get the head CID
+            err := item.Value(func(v []byte) error {
+                headCID = string(v)
+                return nil
+            })
+            if err != nil {
+                return err
+            }
+            break
+        }
+        return nil
+    })
+    return seq, headCID, err
+}
+
+// PutHead stores the current head for a traditional single-file site
+func (s *Store) PutHead(siteID string, seq uint64, headCID string) error {
+    return s.db.Update(func(txn *badger.Txn) error {
+        return txn.Set([]byte(fmt.Sprintf("site:%s:head:%d", siteID, seq)), []byte(headCID))
+    })
+}
+
+// SetHead is an alias for PutHead for backward compatibility
+func (s *Store) SetHead(siteID string, seq uint64, headCID string) error {
+    return s.PutHead(siteID, seq, headCID)
 }
 
 // ResolveContentCID resolves a CID prefix to the full content CID, ensuring uniqueness.
@@ -133,171 +403,61 @@ func (s *Store) ResolveContentCID(prefix string) (string, error) {
     return found, nil
 }
 
-func (s *Store) SetHead(siteID string, seq uint64, headCID string) error {
+// Domain resolution methods
+
+func (s *Store) PutDomain(domain string, siteID string) error {
     return s.db.Update(func(txn *badger.Txn) error {
-        var tmp [8]byte
-        for i := 0; i < 8; i++ {
-            tmp[7-i] = byte(seq >> (8 * i))
-        }
-        if err := txn.Set([]byte("headseq:"+siteID), tmp[:]); err != nil {
-            return err
-        }
-        return txn.Set([]byte("headcid:"+siteID), []byte(headCID))
+        return txn.Set([]byte("domain:"+domain), []byte(siteID))
     })
 }
 
-func (s *Store) GetHead(siteID string) (seq uint64, headCID string, err error) {
-    err = s.db.View(func(txn *badger.Txn) error {
-        get := func(key string) ([]byte, error) {
-            it, e := txn.Get([]byte(key))
-            if e != nil {
-                return nil, e
-            }
-            var v []byte
-            if e := it.Value(func(b []byte) error { v = append([]byte{}, b...); return nil }); e != nil {
-                return nil, e
-            }
-            return v, nil
-        }
-        seqB, e1 := get("headseq:" + siteID)
-        if e1 != nil {
-            return e1
-        }
-        var s64 uint64
-        for i := 0; i < 8; i++ {
-            s64 = (s64 << 8) | uint64(seqB[i])
-        }
-        cidB, e2 := get("headcid:" + siteID)
-        if e2 != nil {
-            return e2
-        }
-        seq = s64
-        headCID = string(cidB)
-        return nil
-    })
-    return
-}
-
-func (s *Store) HasHead(siteID string) (bool, error) {
-    err := s.db.View(func(txn *badger.Txn) error {
-        _, e := txn.Get([]byte("headcid:" + siteID))
-        return e
-    })
-    if errors.Is(err, badger.ErrKeyNotFound) {
-        return false, nil
-    }
-    return err == nil, err
-}
-
-// Domain name system functions
-func (s *Store) RegisterDomain(domain string, siteID string, ownerPub []byte) error {
-    // Validate domain format: alphanumerical.alphanumerical
-    if !isValidDomain(domain) {
-        return errors.New("invalid domain format: must be alphanumerical.alphanumerical")
-    }
-    
-    return s.db.Update(func(txn *badger.Txn) error {
-        // Check if domain already exists
-        if _, err := txn.Get([]byte("domain:" + domain)); err == nil {
-            return errors.New("domain already registered")
-        }
-        
-        // Store domain mapping
-        domainInfo := map[string]interface{}{
-            "domain":   domain,
-            "siteID":   siteID,
-            "ownerPub": ownerPub,
-            "created":  time.Now().Unix(),
-        }
-        
-        domainData, err := json.Marshal(domainInfo)
-        if err != nil {
-            return err
-        }
-        
-        // Store domain -> siteID mapping
-        if err := txn.Set([]byte("domain:"+domain), domainData); err != nil {
-            return err
-        }
-        
-        // Store reverse mapping: siteID -> domain
-        if err := txn.Set([]byte("sitedomain:"+siteID), []byte(domain)); err != nil {
-            return err
-        }
-        
-        return nil
-    })
-}
-
-func (s *Store) ResolveDomain(domain string) (string, error) {
-    var siteID string
+func (s *Store) GetDomain(domain string) (string, error) {
+    var out []byte
     err := s.db.View(func(txn *badger.Txn) error {
         it, err := txn.Get([]byte("domain:" + domain))
         if err != nil {
             return err
         }
-        
-        var domainInfo map[string]interface{}
-        if err := it.Value(func(v []byte) error {
-            return json.Unmarshal(v, &domainInfo)
-        }); err != nil {
-            return err
-        }
-        
-        if id, ok := domainInfo["siteID"].(string); ok {
-            siteID = id
-        }
-        return nil
+        return it.Value(func(v []byte) error {
+            out = append([]byte{}, v...)
+            return nil
+        })
     })
-    
     if err != nil {
         return "", err
     }
-    
-    return siteID, nil
+    return string(out), nil
 }
 
-func (s *Store) GetDomainOwner(domain string) ([]byte, error) {
-    var ownerPub []byte
-    err := s.db.View(func(txn *badger.Txn) error {
-        it, err := txn.Get([]byte("domain:" + domain))
-        if err != nil {
-            return err
-        }
-        
-        var domainInfo map[string]interface{}
-        if err := it.Value(func(v []byte) error {
-            return json.Unmarshal(v, &domainInfo)
-        }); err != nil {
-            return err
-        }
-        
-        if owner, ok := domainInfo["ownerPub"].([]byte); ok {
-            ownerPub = owner
-        }
-        return nil
-    })
-    
-    return ownerPub, err
+func (s *Store) ResolveDomain(domain string) (string, error) {
+    return s.GetDomain(domain)
 }
 
-func (s *Store) ListDomains() ([]string, error) {
-    var domains []string
+func (s *Store) ListDomains() (map[string]string, error) {
+    domains := make(map[string]string)
     err := s.db.View(func(txn *badger.Txn) error {
         opts := badger.DefaultIteratorOptions
         opts.PrefetchValues = false
         it := txn.NewIterator(opts)
         defer it.Close()
         
-        for it.Seek([]byte("domain:")); it.ValidForPrefix([]byte("domain:")); it.Next() {
+        prefix := []byte("domain:")
+        for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
             item := it.Item()
-            k := item.Key()
-            domain := string(k[len("domain:"):])
-            domains = append(domains, domain)
+            k := string(item.Key())
+            domain := strings.TrimPrefix(k, "domain:")
+            
+            var siteID []byte
+            err := item.Value(func(v []byte) error {
+                siteID = append([]byte{}, v...)
+                return nil
+            })
+            if err == nil {
+                domains[domain] = string(siteID)
+            }
         }
         return nil
     })
-    
     return domains, err
 }
 
