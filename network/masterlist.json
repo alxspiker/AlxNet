@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "last_updated": "2025-08-12T05:34:00Z",
+  "network_name": "Betanet Global Network",
+  "description": "Curated master nodes for the Betanet decentralized web platform",
+  "master_nodes": [
+    {
+      "id": "12D3KooWNE3V2wN3mi91ENjg3LpgfebHgvCqnU7njw24iAdbfeD9",
+      "address": "/ip4/0.0.0.0/tcp/4001",
+      "location": "Local Development",
+      "reliability_score": 0.95,
+      "last_seen": "2025-08-12T05:34:00Z",
+      "capabilities": ["storage", "relay", "bootstrap", "master"],
+      "contact": "local@betanet.dev",
+      "description": "Local development master node for testing cross-internet connectivity"
+    }
+  ],
+  "network_stats": {
+    "total_nodes": 1,
+    "active_nodes": 1,
+    "geographic_distribution": {
+      "Development": 100
+    },
+    "network_health": {
+      "uptime": 0.98,
+      "latency_avg": 50,
+      "bandwidth_avg": 100
+    }
+  },
+  "consensus_rules": {
+    "min_peers_for_consensus": 3,
+    "consensus_timeout": "30s",
+    "score_threshold": 0.7,
+    "geographic_preference": true,
+    "load_balancing": true,
+    "fault_tolerance": {
+      "max_failures": 3,
+      "backoff_time": "5m",
+      "switch_threshold": 0.3
+    }
+  },
+  "update_frequency": "1h",
+  "github_repo": "https://github.com/alxspiker/betanet/network/masterlist.json"
+}

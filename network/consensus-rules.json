@@ -1,0 +1,51 @@
+{
+  "version": "1.0",
+  "node_scoring": {
+    "weights": {
+      "latency": 0.20,
+      "uptime": 0.25,
+      "bandwidth": 0.15,
+      "storage": 0.10,
+      "reliability": 0.20,
+      "geographic": 0.10
+    },
+    "thresholds": {
+      "min_score": 0.7,
+      "excellent_score": 0.9,
+      "poor_score": 0.5
+    }
+  },
+  "consensus": {
+    "min_peers": 3,
+    "timeout": "30s",
+    "retry_attempts": 3,
+    "backoff_multiplier": 2.0
+  },
+  "peer_discovery": {
+    "master_list_priority": 1,
+    "local_favorites_priority": 2,
+    "discovered_peers_priority": 3,
+    "mDNS_priority": 4,
+    "update_interval": "5m"
+  },
+  "fault_tolerance": {
+    "max_consecutive_failures": 3,
+    "failure_backoff": "5m",
+    "switch_threshold": 0.3,
+    "health_check_interval": "1m"
+  },
+  "load_balancing": {
+    "enabled": true,
+    "max_connections_per_peer": 5,
+    "geographic_preference": true,
+    "load_distribution": "round_robin"
+  },
+  "security": {
+    "max_peer_age": "24h",
+    "require_authentication": false,
+    "rate_limiting": {
+      "requests_per_minute": 100,
+      "burst_limit": 20
+    }
+  }
+}

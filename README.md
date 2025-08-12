@@ -140,6 +140,30 @@ cd betanet
 
 ## 🚀 Quick Start
 
+### 🌐 **Global Discovery Network** - Cross-Internet Connectivity
+The new global discovery network enables nodes to connect across the internet using:
+- **GitHub Master List** - Always-available curated master nodes
+- **Local Peer Favorites** - User-curated reliable peers
+- **Dynamic Discovery** - Automatic peer discovery and scoring
+- **Intelligent Selection** - Consensus-based peer optimization
+
+```bash
+# Check network status
+./bin/betanet-network -command status
+
+# Discover peers globally
+./bin/betanet-network -command discover
+
+# List available peers
+./bin/betanet-network -command peers -limit 10
+
+# Monitor network health
+./bin/betanet-network -command health
+
+# Refresh network data
+./bin/betanet-network -command refresh
+```
+
 ### 1. **Create a Multi-File Website**
 ```bash
 # Create a website directory
@@ -186,6 +210,43 @@ echo "console.log('Hello from JavaScript!');" > mywebsite/js/app.js
 ```
 
 ## 🎯 Core Components
+
+### **🌐 betanet-network** - Global Discovery Network
+The comprehensive global discovery system that enables cross-internet connectivity:
+- **Master List Management** - GitHub-based curated master nodes
+- **Consensus Engine** - Intelligent peer scoring and selection
+- **Discovery Service** - Multi-source peer discovery (GitHub, local, mDNS)
+- **Load Balancing** - Geographic and performance-based peer distribution
+- **Fault Tolerance** - Automatic failover and peer switching
+
+**Key Features:**
+- **Hybrid Discovery** - Combines curated lists with dynamic discovery
+- **Consensus Scoring** - Multi-factor peer reliability assessment
+- **Geographic Optimization** - Location-aware peer selection
+- **Real-time Health Monitoring** - Network status and performance metrics
+- **Seamless Integration** - Works with existing P2P nodes
+
+**Architecture:**
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   GitHub        │    │   Local         │    │   Dynamic       │
+│   Master List   │───▶│   Favorites     │───▶│   Discovery     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Consensus Engine                             │
+│  • Peer Scoring    • Load Balancing    • Fault Tolerance      │
+│  • Geographic Opt  • Performance Opt   • Auto-failover        │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Network Manager                              │
+│  • Service Coordination  • Health Monitoring  • Peer Mgmt      │
+│  • Status Reporting      • Configuration      • Integration    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ### **betanet-node** - Network Node
 The core networking component that:
