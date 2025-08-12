@@ -1,25 +1,22 @@
-# 🌐 Betanet - Multi-File Decentralized Web Platform
- 
-**A complete, production-ready implementation of a decentralized web platform that supports full multi-file websites with HTML, CSS, JavaScript, and images - all stored on the blockchain.**
+# 🌐 Betanet - Decentralized Web Platform
+
+**A decentralized web platform that supports multi-file websites with HTML, CSS, JavaScript, and images - all stored on the blockchain with cryptographic security.**
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/Status-Working%20Prototype-orange.svg)]()
 [![Security](https://img.shields.io/badge/Security-Hardened-red.svg)]()
-[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
-[![Master Node](https://img.shields.io/badge/Master%20Node-🌐%20Live%20on%20GitHub-blue.svg)](https://github.com/alxspiker/betanet/actions)
 
 ## 🚀 What is Betanet?
 
-Betanet is a **fully decentralized, censorship-resistant web platform** that replaces traditional centralized web infrastructure with peer-to-peer technology. This implementation provides:
+Betanet is a **decentralized, censorship-resistant web platform** that replaces traditional centralized web infrastructure with peer-to-peer technology. This implementation provides:
 
 - **🌍 Multi-File Websites** - Complete websites with HTML, CSS, JavaScript, and images
 - **🔐 Cryptographic Identity** - Ed25519-based site ownership and updates
-- **📱 Modern Browser Interface** - Chrome-like UI for browsing decentralized sites
 - **💼 Secure Wallet System** - BIP-39 mnemonic-based site management
 - **🔄 Peer-to-Peer Networking** - libp2p-based distributed content delivery
 - **🔒 Content Encryption** - Optional passphrase-based content protection
-- **🎨 Rich Web Experience** - Full support for modern web technologies
+- **🎨 Unified Dashboard** - Single interface for all system operations
 
 ## 🛡️ **SECURITY & ROBUSTNESS FEATURES**
 
@@ -66,18 +63,12 @@ Betanet is a **fully decentralized, censorship-resistant web platform** that rep
 - **Update validation** - Cryptographic proof of site ownership
 - **Link signatures** - Proof that update keys are authorized
 
-### 📱 **Modern User Experience**
-- **Chrome-like browser** - Familiar web browsing interface with tabs
-- **Auto-discovery** - mDNS and localhost peer discovery
-- **Standalone operation** - Browser starts its own node automatically
-- **Responsive UI** - Scrollable content areas, modern controls
-- **Multi-tab support** - Browse multiple sites simultaneously
-
-### 🌍 **Peer-to-Peer Network**
-- **libp2p networking** - Industry-standard P2P library
-- **GossipSub protocol** - Efficient content distribution
-- **mDNS discovery** - Automatic LAN peer discovery
-- **Bootstrap support** - Manual peer connection fallback
+### 🎯 **Unified User Experience**
+- **Single Dashboard** - All operations accessible from one interface
+- **Wallet Management** - Complete site and key management
+- **Node Control** - Full network node operations
+- **Network Monitoring** - Real-time peer and health monitoring
+- **Web Browsing** - Browse decentralized sites directly
 
 ## 🛡️ **SECURITY ARCHITECTURE**
 
@@ -142,7 +133,7 @@ cd betanet
 ## 🚀 Quick Start
 
 ### 🌐 **Global Discovery Network** - Cross-Internet Connectivity
-The new global discovery network enables nodes to connect across the internet using:
+The global discovery network enables nodes to connect across the internet using:
 - **GitHub Master List** - Always-available curated master nodes
 - **Local Peer Favorites** - User-curated reliable peers
 - **Dynamic Discovery** - Automatic peer discovery and scoring
@@ -165,7 +156,16 @@ The new global discovery network enables nodes to connect across the internet us
 ./bin/betanet-network -command refresh
 ```
 
-### 1. **Create a Multi-File Website**
+### 1. **Launch the Unified Dashboard**
+```bash
+# Launch the complete system management interface
+./launch-dashboard.sh
+
+# Or launch directly
+./bin/betanet-dashboard
+```
+
+### 2. **Create a Multi-File Website**
 ```bash
 # Create a website directory
 mkdir -p mywebsite/{css,js,images}
@@ -176,78 +176,46 @@ echo "body { font-family: Arial; color: #333; }" > mywebsite/css/style.css
 echo "console.log('Hello from JavaScript!');" > mywebsite/js/app.js
 ```
 
-### 2. **Create a Wallet & Site**
-```bash
-# Create wallet and site
-./bin/betanet-wallet new -out /tmp/wallet.json
-./bin/betanet-wallet add-site -wallet /tmp/wallet.json -mnemonic "your mnemonic" -label mysite
-```
-
-### 3. **Publish Your Multi-File Website**
-```bash
-# Publish the complete website
-./bin/betanet-wallet publish-website \
-  -wallet /tmp/wallet.json \
-  -mnemonic "your mnemonic" \
-  -label mysite \
-  -dir mywebsite \
-  -main index.html
-```
-
-### 4. **Register a Domain**
-```bash
-# Register a human-readable domain
-./bin/betanet-wallet register-domain \
-  -wallet /tmp/wallet.json \
-  -mnemonic "your mnemonic" \
-  -label mysite \
-  -domain mysite.bn
-```
-
-### 5. **Browse Your Website**
-```bash
-# Open the browser and navigate to: mysite.bn
-./bin/betanet-browser
-```
+### 3. **Use the Dashboard to Publish**
+- **Wallet Tab**: Create wallet, add site, publish content
+- **Node Tab**: Start node, manage network operations
+- **Network Tab**: Monitor peers and network health
+- **Browser Tab**: Browse your published website
 
 ## 🎯 Core Components
 
-### **🌐 betanet-network** - Global Discovery Network
-The comprehensive global discovery system that enables cross-internet connectivity:
-- **Master List Management** - GitHub-based curated master nodes
-- **Consensus Engine** - Intelligent peer scoring and selection
-- **Discovery Service** - Multi-source peer discovery (GitHub, local, mDNS)
-- **Load Balancing** - Geographic and performance-based peer distribution
-- **Fault Tolerance** - Automatic failover and peer switching
+### **🌐 betanet-dashboard** - Unified System Management
+The **single, unified interface** that provides access to all system operations:
 
-**Key Features:**
-- **Hybrid Discovery** - Combines curated lists with dynamic discovery
-- **Consensus Scoring** - Multi-factor peer reliability assessment
-- **Geographic Optimization** - Location-aware peer selection
-- **Real-time Health Monitoring** - Network status and performance metrics
-- **Seamless Integration** - Works with existing P2P nodes
+**💼 Wallet Tab - Complete Wallet Management**
+- Create wallets with mnemonic generation
+- Add sites and manage cryptographic keys
+- Publish content (encrypted or plain)
+- Register `.bn` domains
+- Publish complete multi-file websites
+- Add individual files to websites
+- Export private keys
 
-**Architecture:**
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   GitHub        │    │   Local         │    │   Dynamic       │
-│   Master List   │───▶│   Favorites     │───▶│   Discovery     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Consensus Engine                             │
-│  • Peer Scoring    • Load Balancing    • Fault Tolerance      │
-│  • Geographic Opt  • Performance Opt   • Auto-failover        │
-└─────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Network Manager                              │
-│  • Service Coordination  • Health Monitoring  • Peer Mgmt      │
-│  • Status Reporting      • Configuration      • Integration    │
-└─────────────────────────────────────────────────────────────────┘
-```
+**🖥️ Node Tab - Full Node Control**
+- Initialize cryptographic keys
+- Start/stop network nodes
+- Publish content and websites
+- Browse sites and add files
+- Real-time node status and logs
+
+**🌐 Network Tab - Network Management**
+- Start/stop network services
+- Discover peers automatically
+- Monitor network health and status
+- View connected peers and statistics
+- Real-time network monitoring
+
+**🌍 Browser Tab - Web Browsing**
+- Navigate to site IDs or `.bn` domains
+- Browse decentralized websites
+- Multi-tab support
+- Navigation history (back/forward)
+- Rich content rendering
 
 ### **betanet-node** - Network Node
 The core networking component that:
@@ -316,41 +284,42 @@ Complete wallet system for managing multi-file websites:
 ./bin/betanet-wallet register-domain -wallet wallet.json -mnemonic "..." -label mysite -domain mysite.bn
 ```
 
-### **betanet-browser** - Web Interface
-Modern browser interface that:
-- **Auto-starts node** - Creates local network node automatically
-- **Resolves domains** - Converts `.bn` domains to site IDs
-- **Displays websites** - Renders complete multi-file websites
-- **Chrome-like UI** - Familiar navigation controls and address bar
-- **Multi-tab support** - Browse multiple sites simultaneously
-- **File handling** - Proper MIME type detection and rendering
+### **betanet-network** - Global Discovery Network
+The comprehensive global discovery system that enables cross-internet connectivity:
+- **Master List Management** - GitHub-based curated master nodes
+- **Consensus Engine** - Intelligent peer scoring and selection
+- **Discovery Service** - Multi-source peer discovery (GitHub, local, mDNS)
+- **Load Balancing** - Geographic and performance-based peer distribution
+- **Fault Tolerance** - Automatic failover and peer switching
 
-**Features:**
-- **Address bar** - Type site IDs or `.bn` domains
-- **Navigation** - Back, forward, refresh buttons
-- **Tab management** - Multiple tabs for different sites
-- **Auto-discovery** - Finds peers via mDNS
-- **Standalone** - No external dependencies
-- **Flexible data** - Use existing node databases or create new ones
+**Key Features:**
+- **Hybrid Discovery** - Combines curated lists with dynamic discovery
+- **Consensus Scoring** - Multi-factor peer reliability assessment
+- **Geographic Optimization** - Location-aware peer selection
+- **Real-time Health Monitoring** - Network status and performance metrics
+- **Seamless Integration** - Works with existing P2P nodes
 
-**Data Directory Options:**
-```bash
-# Use existing node database (recommended for testing)
-./bin/betanet-browser -data /tmp/node1
-
-# Use demo node database
-./bin/betanet-browser -data temp/demo-node
-
-# Use default browser database (isolated)
-./bin/betanet-browser
+**Architecture:**
 ```
-
-### **betanet-gui** - Management Interface
-Desktop GUI for node and website management:
-- **Node control** - Start/stop network nodes
-- **Website management** - Create and publish multi-file websites
-- **Network monitoring** - Peer connections and content status
-- **Content browsing** - View and manage published websites
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   GitHub        │    │   Local         │    │   Dynamic       │
+│   Master List   │───▶│   Favorites     │───▶│   Discovery     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Consensus Engine                             │
+│  • Peer Scoring    • Load Balancing    • Fault Tolerance      │
+│  • Geographic Opt  • Performance Opt   • Auto-failover        │
+└─────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    Network Manager                              │
+│  • Service Coordination  • Health Monitoring  • Peer Mgmt      │
+│  • Status Reporting      • Configuration      • Integration    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## 🔧 Advanced Usage
 
@@ -415,21 +384,9 @@ echo "<!DOCTYPE html>..." > mywebsite/index.html
 echo "body { ... }" > mywebsite/css/style.css
 echo "console.log('...');" > mywebsite/js/app.js
 
-# 3. Publish complete website
-./bin/betanet-wallet publish-website \
-  -wallet wallet.json \
-  -mnemonic "..." \
-  -label mysite \
-  -dir mywebsite \
-  -main index.html
-
-# 4. Add additional files later
-./bin/betanet-wallet add-website-file \
-  -wallet wallet.json \
-  -mnemonic "..." \
-  -label mysite \
-  -path css/theme.css \
-  -content /path/to/theme.css
+# 3. Use the dashboard to publish
+./launch-dashboard.sh
+# Navigate to Wallet Tab → Publish Website
 ```
 
 ### **Domain Name System**
@@ -447,13 +404,8 @@ echo "console.log('...');" > mywebsite/js/app.js
 
 ### **Content Encryption**
 ```bash
-# Publish encrypted content
-./bin/betanet-wallet publish-website \
-  -wallet wallet.json \
-  -mnemonic "..." \
-  -label mysite \
-  -dir mywebsite \
-  -encrypt-pass "secret phrase"
+# Publish encrypted content using the dashboard
+# Navigate to Wallet Tab → Publish Content → Enter encryption passphrase
 
 # Decrypt content when browsing
 ./bin/betanet-node browse \
@@ -479,8 +431,8 @@ echo "console.log('...');" > mywebsite/js/app.js
 ### **Core Components**
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   betanet-node  │    │ betanet-wallet  │    │ betanet-browser │
-│   (P2P Node)    │    │ (Website Mgmt)  │    │   (Web UI)      │
+│   betanet-node  │    │ betanet-wallet  │    │ betanet-network │
+│   (P2P Node)    │    │ (Website Mgmt)  │    │ (Discovery)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
@@ -488,6 +440,11 @@ echo "console.log('...');" > mywebsite/js/app.js
                     ┌─────────────────┐
                     │   BadgerDB      │
                     │  (Storage)      │
+                    └─────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │ betanet-dashboard│
+                    │ (Unified UI)    │
                     └─────────────────┘
 ```
 
@@ -567,18 +524,6 @@ Your Betanet master node is **continuously tested** by GitHub Actions from world
 
 **View live testing:** [GitHub Actions](https://github.com/alxspiker/betanet/actions)
 
-### **Complete Multi-File Website Test**
-```bash
-# Run the automated test script
-./test-domain-workflow.sh
-
-# This script demonstrates:
-# - Multi-file website creation
-# - HTML, CSS, JavaScript, and image files
-# - Website publishing and domain registration
-# - Browser testing with full website functionality
-```
-
 ### **Security Testing**
 ```bash
 # Run security tests
@@ -600,15 +545,9 @@ go tool cover -html=coverage.out -o coverage.html
 # Terminal 2: Start node B with bootstrap
 ./bin/betanet-node run -data /tmp/nodeB -listen /ip4/0.0.0.0/tcp/4002 -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
 
-# Terminal 3: Create and publish multi-file website
-./bin/betanet-wallet new -out /tmp/test-wallet.json
-./bin/betanet-wallet add-site -wallet /tmp/test-wallet.json -mnemonic "..." -label testsite
-./bin/betanet-wallet publish-website -wallet /tmp/test-wallet.json -mnemonic "..." -label testsite -dir /path/website
-./bin/betanet-wallet register-domain -wallet /tmp/test-wallet.json -mnemonic "..." -label testsite -domain test.bn -data /tmp/nodeA
-
-# Terminal 4: Browse website
-./bin/betanet-browser -data /tmp/nodeA
-# Navigate to: test.bn
+# Terminal 3: Launch dashboard
+./launch-dashboard.sh
+# Use the dashboard to create and publish websites
 ```
 
 ## 📚 API Reference
@@ -719,4 +658,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **🌐 Betanet - Building the decentralized web with complete multi-file websites.**
 
-*Now supporting HTML, CSS, JavaScript, images, and more - all stored securely on the blockchain with enterprise-grade security features.*
+*Now featuring a unified dashboard for complete system management - all operations accessible from one intuitive interface.*
