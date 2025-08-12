@@ -1,5 +1,5 @@
 # 🌐 Betanet - Multi-File Decentralized Web Platform
-
+ 
 **A complete, production-ready implementation of a decentralized web platform that supports full multi-file websites with HTML, CSS, JavaScript, and images - all stored on the blockchain.**
 
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org)
