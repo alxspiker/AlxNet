@@ -20,7 +20,15 @@ import (
     "fyne.io/fyne/v2/widget"
 )
 
-// Modern browser interface for decentralized web
+// Tab represents a browser tab
+type Tab struct {
+    Title     string
+    Content   *widget.RichText
+    Address   string
+    IsActive  bool
+}
+
+// Modern tabbed browser interface for decentralized web
 
 func main() {
     // Parse command line arguments
@@ -64,21 +72,127 @@ func main() {
     // Browser status - minimal, hidden by default
     _ = ""
 
+    // Tab management
+    var tabs []*Tab
+    var currentTabIndex int = 0
+    
+    // Tab container
+    tabContainer := container.NewStack()
+    
+    // Tab bar
+    tabBar := container.NewHBox()
+    
     // Modern address bar with better styling
     addressBar := widget.NewEntry()
     addressBar.SetPlaceHolder("Enter site address (like example.bn or site ID)")
     addressBar.TextStyle = fyne.TextStyle{Bold: false}
-    
-    // Main content area with better styling
-    contentArea := widget.NewRichText()
-    contentArea.Wrapping = fyne.TextWrapWord
-    contentScroll := container.NewScroll(contentArea)
     
     var currentNode *p2p.Node
     var currentDB *store.Store
     
     // Forward declarations
     var browseToSite func(string)
+    var updateTabBar func()
+    var closeTab func(int)
+    var showSettingsTab func()
+    
+    // Function to create a new tab
+    createNewTab := func(title string, address string) *Tab {
+        content := widget.NewRichText()
+        content.Wrapping = fyne.TextWrapWord
+        
+        tab := &Tab{
+            Title:   title,
+            Content: content,
+            Address: address,
+            IsActive: false,
+        }
+        
+        tabs = append(tabs, tab)
+        return tab
+    }
+    
+    // Function to switch to a tab
+    switchToTab := func(index int) {
+        if index >= 0 && index < len(tabs) {
+            // Deactivate current tab
+            if currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].IsActive = false
+            }
+            
+            // Activate new tab
+            currentTabIndex = index
+            tabs[currentTabIndex].IsActive = true
+            
+            // Update tab container
+            tabContainer.Objects = []fyne.CanvasObject{tabs[currentTabIndex].Content}
+            tabContainer.Refresh()
+            
+            // Update address bar
+            addressBar.SetText(tabs[currentTabIndex].Address)
+            
+            // Update tab bar styling
+            updateTabBar()
+        }
+    }
+    
+    // Function to update tab bar styling
+    updateTabBar = func() {
+        tabBar.Objects = nil
+        for i, tab := range tabs {
+            tabIndex := i // Capture for closure
+            tabBtn := widget.NewButton(tab.Title, func() {
+                switchToTab(tabIndex)
+            })
+            
+            if tab.IsActive {
+                tabBtn.Importance = widget.HighImportance
+            } else {
+                tabBtn.Importance = widget.LowImportance
+            }
+            
+            // Add close button for tabs (except the first tab)
+            if i > 0 {
+                closeBtn := widget.NewButtonWithIcon("", theme.CancelIcon(), func() {
+                    closeTab(tabIndex)
+                })
+                closeBtn.Importance = widget.LowImportance
+                
+                tabRow := container.NewHBox(tabBtn, closeBtn)
+                tabBar.Add(tabRow)
+            } else {
+                tabBar.Add(tabBtn)
+            }
+        }
+        tabBar.Refresh()
+    }
+    
+    // Function to close a tab
+    closeTab = func(index int) {
+        if index > 0 && index < len(tabs) { // Don't close the first tab
+            // Remove tab from slice
+            tabs = append(tabs[:index], tabs[index+1:]...)
+            
+            // Adjust current tab index if needed
+            if currentTabIndex >= index {
+                currentTabIndex--
+            }
+            if currentTabIndex < 0 {
+                currentTabIndex = 0
+            }
+            
+            // Switch to current tab
+            if len(tabs) > 0 {
+                switchToTab(currentTabIndex)
+            }
+        }
+    }
+    
+    // Function to add a new tab
+    addNewTab := func(title string, address string) {
+        createNewTab(title, address)
+        switchToTab(len(tabs) - 1)
+    }
     
     // Helper function to check if string is hex
     isHexString := func(s string) bool {
@@ -127,7 +241,9 @@ func main() {
         db, err := store.Open(dir)
         if err != nil {
             fmt.Printf("BROWSER: Database error: %v\n", err)
-            contentArea.ParseMarkdown("# Connection Error\n\nCould not initialize browser database.")
+            if len(tabs) > 0 {
+                tabs[0].Content.ParseMarkdown("# Connection Error\n\nCould not initialize browser database.")
+            }
             return
         }
         
@@ -139,13 +255,17 @@ func main() {
         node, err := p2p.New(ctx, db, "/ip4/0.0.0.0/tcp/4001", nil)
         if err != nil {
             fmt.Printf("BROWSER: Local node creation failed: %v\n", err)
-            contentArea.ParseMarkdown("# Network Error\n\nCould not create local network node.")
+            if len(tabs) > 0 {
+                tabs[0].Content.ParseMarkdown("# Network Error\n\nCould not create local network node.")
+            }
             return
         }
         
         if err := node.Start(ctx); err != nil {
             fmt.Printf("BROWSER: Local node start failed: %v\n", err)
-            contentArea.ParseMarkdown("# Network Error\n\nCould not start local network node.")
+            if len(tabs) > 0 {
+                tabs[0].Content.ParseMarkdown("# Network Error\n\nCould not start local network node.")
+            }
             return
         }
         
@@ -153,9 +273,9 @@ func main() {
         currentDB = db
         fmt.Printf("BROWSER: Started local node on port 4001\n")
         
-        // Show welcome message
-        fyne.DoAndWait(func() {
-            contentArea.ParseMarkdown(`# Welcome to Betanet Browser!
+        // Show welcome message in first tab
+        if len(tabs) > 0 {
+            tabs[0].Content.ParseMarkdown(`# Welcome to Betanet Browser!
 
 ## 🌐 Decentralized Web Browser
 
@@ -172,7 +292,7 @@ The browser has started its own local network node on port 4001.
 - Or manually enter the node address
 
 *This browser works like Chrome, but for decentralized websites.*`)
-        })
+        }
     }
     
     // Modern browser navigation buttons with better styling
@@ -191,8 +311,10 @@ The browser has started its own local network node on port 4001.
     refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
         fmt.Println("BROWSER: Refresh button clicked")
         // Reload current site
-        if addressBar.Text != "" {
-            browseToSite(addressBar.Text)
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            if tabs[currentTabIndex].Address != "" {
+                browseToSite(tabs[currentTabIndex].Address)
+            }
         }
     })
     refreshBtn.Importance = widget.LowImportance
@@ -205,9 +327,42 @@ The browser has started its own local network node on port 4001.
     })
     goBtn.Importance = widget.HighImportance
     
+    // New tab button
+    newTabBtn := widget.NewButtonWithIcon("", theme.ContentAddIcon(), func() {
+        addNewTab("New Tab", "")
+    })
+    newTabBtn.Importance = widget.LowImportance
+    
+    // Function to show settings content
+    showSettingsTab = func() {
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            currentTab := tabs[currentTabIndex]
+            currentTab.Content.ParseMarkdown(`# Browser Settings
+
+## 🔧 Configuration Options
+
+### Network Settings
+- **Data Directory**: ` + settingsDataDir.Text + `
+- **Listen Address**: ` + listen.Text + `
+- **Bootstrap Nodes**: ` + bootstrap.Text + `
+
+### Browser Settings
+- **Current Node**: ` + fmt.Sprintf("%v", currentNode != nil) + `
+- **Database**: ` + fmt.Sprintf("%v", currentDB != nil) + `
+
+### Advanced Options
+- **Node Port**: 4001
+- **Discovery**: mDNS enabled
+
+*Settings changes will take effect after restart.*`)
+        }
+    }
+    
     settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
         fmt.Println("BROWSER: Settings button clicked")
-        // TODO: Show settings dialog
+        // Open settings in a new tab
+        addNewTab("Settings", "settings://internal")
+        showSettingsTab()
     })
     settingsBtn.Importance = widget.LowImportance
     
@@ -216,7 +371,9 @@ The browser has started its own local network node on port 4001.
         fmt.Printf("BROWSER: Browsing to site: %s\n", siteAddr)
         
         if currentDB == nil || currentNode == nil {
-            contentArea.ParseMarkdown("# Error\n\nBrowser not connected. Please wait for initialization.")
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nBrowser not connected. Please wait for initialization.")
+            }
             return
         }
         
@@ -224,40 +381,59 @@ The browser has started its own local network node on port 4001.
         cleanAddr := strings.TrimPrefix(siteAddr, "betanet://")
         cleanAddr = strings.TrimSpace(cleanAddr)
         
+        // Update current tab address
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            tabs[currentTabIndex].Address = cleanAddr
+            tabs[currentTabIndex].Title = cleanAddr
+            updateTabBar()
+        }
+        
         // Resolve .bn domain names to site IDs
         siteID := resolveName(cleanAddr)
         
-        contentArea.ParseMarkdown("# Loading...\n\nSearching for site: " + siteID)
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            tabs[currentTabIndex].Content.ParseMarkdown("# Loading...\n\nSearching for site: " + siteID)
+        }
         
         // Try to get site from local database
         if has, _ := currentDB.HasHead(siteID); !has {
-            contentArea.ParseMarkdown("# Site Not Found\n\nSite **" + siteID + "** is not available in the local cache.\n\nThis could mean:\n- The site doesn't exist\n- The site hasn't been published to this network\n- The site hasn't been cached locally yet\n\n*In a full implementation, this would attempt to fetch from the network.*")
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Site Not Found\n\nSite **" + siteID + "** is not available in the local cache.\n\nThis could mean:\n- The site doesn't exist\n- The site hasn't been published to this network\n- The site hasn't been cached locally yet\n\n*In a full implementation, this would attempt to fetch from the network.*")
+            }
             return
         }
         
         // Get site content
         seq, headCID, err := currentDB.GetHead(siteID)
         if err != nil {
-            contentArea.ParseMarkdown("# Error\n\nFailed to load site: " + err.Error())
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site: " + err.Error())
+            }
             return
         }
         
         recBytes, err := currentDB.GetRecord(headCID)
         if err != nil {
-            contentArea.ParseMarkdown("# Error\n\nFailed to load site record: " + err.Error())
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site record: " + err.Error())
+            }
             return
         }
         
         var rec core.UpdateRecord
         dec, _ := cbor.DecOptions{}.DecMode()
         if err := dec.Unmarshal(recBytes, &rec); err != nil {
-            contentArea.ParseMarkdown("# Error\n\nFailed to parse site record: " + err.Error())
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to parse site record: " + err.Error())
+            }
             return
         }
         
         content, err := currentDB.GetContent(rec.ContentCID)
         if err != nil {
-            contentArea.ParseMarkdown("# Error\n\nFailed to load site content: " + err.Error())
+            if len(tabs) > 0 && currentTabIndex < len(tabs) {
+                tabs[currentTabIndex].Content.ParseMarkdown("# Error\n\nFailed to load site content: " + err.Error())
+            }
             return
         }
         
@@ -266,12 +442,14 @@ The browser has started its own local network node on port 4001.
         
         // If it looks like HTML, show it as-is, otherwise show as markdown
         contentStr := string(content)
-        if strings.Contains(contentStr, "<html>") || strings.Contains(contentStr, "<h1>") {
-            // Show HTML content as markdown for now (basic rendering)
-            contentArea.ParseMarkdown("# " + cleanAddr + "\n\n```html\n" + contentStr + "\n```")
-        } else {
-            // Show as markdown (use the original address for title)
-            contentArea.ParseMarkdown("# " + cleanAddr + "\n\n" + contentStr)
+        if len(tabs) > 0 && currentTabIndex < len(tabs) {
+            if strings.Contains(contentStr, "<html>") || strings.Contains(contentStr, "<h1>") {
+                // Show HTML content as markdown for now (basic rendering)
+                tabs[currentTabIndex].Content.ParseMarkdown("# " + cleanAddr + "\n\n```html\n" + contentStr + "\n```")
+            } else {
+                // Show as markdown (use the original address for title)
+                tabs[currentTabIndex].Content.ParseMarkdown("# " + cleanAddr + "\n\n" + contentStr)
+            }
         }
     }
 
@@ -290,8 +468,9 @@ The browser has started its own local network node on port 4001.
         refreshBtn,
     )
     
-    // Right side: Action buttons (Go, Settings)
+    // Right side: Action buttons (New Tab, Go, Settings)
     rightNav := container.NewHBox(
+        newTabBtn,
         goBtn,
         settingsBtn,
     )
@@ -303,8 +482,23 @@ The browser has started its own local network node on port 4001.
         addressBar, // This will expand to fill the available space
     )
     
-    // Main layout: Nav bar at top, content area filling the rest
-    w.SetContent(container.NewBorder(navBar, nil, nil, nil, contentScroll))
+    // Create initial tab
+    initialTab := createNewTab("Welcome", "")
+    tabs = append(tabs, initialTab)
+    currentTabIndex = 0
+    tabs[0].IsActive = true
+    
+    // Set initial tab content
+    tabContainer.Objects = []fyne.CanvasObject{initialTab.Content}
+    
+    // Update tab bar
+    updateTabBar()
+    
+    // Main layout: Nav bar at top, tab bar below, content area filling the rest
+    contentArea := container.NewBorder(nil, nil, nil, nil, tabContainer)
+    mainLayout := container.NewBorder(navBar, nil, nil, nil, container.NewVBox(tabBar, contentArea))
+    
+    w.SetContent(mainLayout)
     
     // Auto-initialize browser when opened
     go func() {
