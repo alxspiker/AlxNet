@@ -6,6 +6,8 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)]()
 
+<img width="1297" height="350" alt="image" src="https://github.com/user-attachments/assets/3c727c41-fedc-4e17-bbd5-7d7f730ac388" />
+
 ## 🚀 What is Betanet?
 
 Betanet is a **fully decentralized, censorship-resistant web platform** that replaces traditional centralized web infrastructure with peer-to-peer technology. This implementation provides:
