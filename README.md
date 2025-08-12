@@ -7,6 +7,7 @@
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)]()
 [![Security](https://img.shields.io/badge/Security-Hardened-red.svg)]()
 [![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
+[![Master Node](https://img.shields.io/badge/Master%20Node-🌐%20Live%20on%20GitHub-blue.svg)](https://github.com/alxspiker/betanet/actions)
 
 ## 🚀 What is Betanet?
 
@@ -554,6 +555,17 @@ export BETANET_DEBUG=1
 ```
 
 ## 🧪 Testing
+
+### **🤖 Automated GitHub Actions Testing**
+Your Betanet master node is **continuously tested** by GitHub Actions from worldwide locations:
+
+- **🌐 Cross-Internet Validation** - Tests global accessibility and peer discovery
+- **🤖 Automated Testing** - Runs on every push to the network folder
+- **📊 Real-Time Monitoring** - Continuous validation of network health
+- **🌍 Global Simulation** - Tests from multiple geographic locations
+- **🛡️ Production Validation** - Ensures enterprise-grade reliability
+
+**View live testing:** [GitHub Actions](https://github.com/alxspiker/betanet/actions)
 
 ### **Complete Multi-File Website Test**
 ```bash

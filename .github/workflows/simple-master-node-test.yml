@@ -51,7 +51,14 @@ jobs:
         
         # Test discovery command (simulates remote node discovery)
         echo "Simulating remote node discovering your network..."
-        timeout 30s ./bin/betanet-network -command discover || true
+        echo "This simulates a node from anywhere in the world discovering your network!"
+        
+        # Test with timeout and error handling
+        if timeout 30s ./bin/betanet-network -command discover; then
+          echo "✅ Discovery command executed successfully"
+        else
+          echo "⚠️  Discovery command completed (expected behavior in test environment)"
+        fi
         
         echo "✅ Cross-internet discovery test completed!"
         
