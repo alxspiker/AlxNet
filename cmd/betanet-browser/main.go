@@ -18,10 +18,9 @@ import (
     "fyne.io/fyne/v2/container"
     "fyne.io/fyne/v2/theme"
     "fyne.io/fyne/v2/widget"
-
 )
 
-// Simple browser for decentralized web
+// Modern browser interface for decentralized web
 
 func main() {
     // Parse command line arguments
@@ -52,7 +51,8 @@ func main() {
     
     a := app.New()
     w := a.NewWindow("Betanet Browser")
-    w.Resize(fyne.NewSize(1200, 800))
+    w.Resize(fyne.NewSize(1400, 900))
+    w.SetIcon(theme.ComputerIcon())
 
     // Hidden settings - accessed via settings button
     settingsDataDir := widget.NewEntry()
@@ -64,11 +64,12 @@ func main() {
     // Browser status - minimal, hidden by default
     _ = ""
 
-    // Address bar like Chrome
+    // Modern address bar with better styling
     addressBar := widget.NewEntry()
     addressBar.SetPlaceHolder("Enter site address (like example.bn or site ID)")
+    addressBar.TextStyle = fyne.TextStyle{Bold: false}
     
-    // Main content area
+    // Main content area with better styling
     contentArea := widget.NewRichText()
     contentArea.Wrapping = fyne.TextWrapWord
     contentScroll := container.NewScroll(contentArea)
@@ -173,16 +174,19 @@ The browser has started its own local network node on port 4001.
 *This browser works like Chrome, but for decentralized websites.*`)
         })
     }
-    // Browser navigation buttons
+    
+    // Modern browser navigation buttons with better styling
     backBtn := widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() {
         fmt.Println("BROWSER: Back button clicked")
         // TODO: Implement browser history
     })
+    backBtn.Importance = widget.LowImportance
     
     forwardBtn := widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() {
         fmt.Println("BROWSER: Forward button clicked")
         // TODO: Implement browser history
     })
+    forwardBtn.Importance = widget.LowImportance
     
     refreshBtn := widget.NewButtonWithIcon("", theme.ViewRefreshIcon(), func() {
         fmt.Println("BROWSER: Refresh button clicked")
@@ -191,6 +195,7 @@ The browser has started its own local network node on port 4001.
             browseToSite(addressBar.Text)
         }
     })
+    refreshBtn.Importance = widget.LowImportance
     
     goBtn := widget.NewButton("Go", func() {
         siteAddr := strings.TrimSpace(addressBar.Text)
@@ -198,11 +203,13 @@ The browser has started its own local network node on port 4001.
             browseToSite(siteAddr)
         }
     })
+    goBtn.Importance = widget.HighImportance
     
     settingsBtn := widget.NewButtonWithIcon("", theme.SettingsIcon(), func() {
         fmt.Println("BROWSER: Settings button clicked")
         // TODO: Show settings dialog
     })
+    settingsBtn.Importance = widget.LowImportance
     
     // Browse to site function
     browseToSite = func(siteAddr string) {
@@ -275,13 +282,25 @@ The browser has started its own local network node on port 4001.
         }
     }
 
-    // Create Chrome-like layout
-    // Navigation bar: Back | Forward | Refresh | Address Bar | Go | Settings
-    navBar := container.NewHBox(
+    // Create modern Chrome-like layout with proper spacing
+    // Left side: Navigation buttons (Back, Forward, Refresh)
+    leftNav := container.NewHBox(
         backBtn,
         forwardBtn, 
         refreshBtn,
-        container.NewBorder(nil, nil, nil, container.NewHBox(goBtn, settingsBtn), addressBar),
+    )
+    
+    // Right side: Action buttons (Go, Settings)
+    rightNav := container.NewHBox(
+        goBtn,
+        settingsBtn,
+    )
+    
+    // Main navigation bar: Left nav | Address bar (expanding) | Right nav
+    navBar := container.NewBorder(
+        nil, nil, 
+        leftNav, rightNav, 
+        addressBar, // This will expand to fill the available space
     )
     
     // Main layout: Nav bar at top, content area filling the rest
