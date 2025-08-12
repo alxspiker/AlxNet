@@ -177,14 +177,6 @@ build_binaries() {
     else
         log_warning "betanet-dashboard build failed (likely missing X11/OpenGL dev libs). CLI builds are ready."
     fi
-    
-    # Build betanet-dashboard (requires Linux GUI dev libs)
-    log_info "Building betanet-dashboard..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-dashboard" ./cmd/betanet-dashboard; then
-        log_success "betanet-dashboard built successfully"
-    else
-        log_warning "betanet-dashboard build failed (likely missing X11/OpenGL dev libs)."
-    fi
 }
 
 # Security audit of built binaries

@@ -203,7 +203,7 @@ func NewDashboard(a fyne.App, dataDir string) *Dashboard {
 
 	// Create main window
 	d.window = a.NewWindow("🌐 Betanet Dashboard - Complete System Management")
-	d.window.Resize(fyne.NewSize(1600, 1000))
+	d.window.Resize(fyne.NewSize(1200, 800)) // More reasonable default size
 	d.window.SetIcon(theme.ComputerIcon())
 
 	// Initialize core components
@@ -278,13 +278,13 @@ func (d *Dashboard) createMainContainer() {
 	d.tabContainer.Append(container.NewTabItem("🌐 Network", networkTab.container))
 	d.tabContainer.Append(container.NewTabItem("🌍 Browser", browserTab.container))
 
-	// Create main container
+	// Create main container with better proportions
 	d.mainContainer = container.NewBorder(
-		nil,            // top
-		d.statusBar,    // bottom
-		nil,            // left
-		nil,            // right
-		d.tabContainer, // center
+		nil,                                 // top
+		d.statusBar,                         // bottom
+		nil,                                 // left
+		nil,                                 // right
+		container.NewScroll(d.tabContainer), // center - scrollable tabs
 	)
 
 	d.window.SetContent(d.mainContainer)
@@ -364,7 +364,7 @@ func (d *Dashboard) createWalletTab() *WalletTab {
 		},
 	)
 
-	// Create form container
+	// Create form container with better layout
 	formContainer := container.NewVBox(
 		widget.NewLabel("💼 Wallet Management"),
 		container.NewVBox(
@@ -412,28 +412,27 @@ func (d *Dashboard) createWalletTab() *WalletTab {
 		wt.registerDomainBtn,
 	)
 
-	// Create lists container
-	listsContainer := container.NewHSplit(
-		container.NewVBox(
-			widget.NewLabel("📋 Sites"),
-			wt.sitesList,
-		),
-		container.NewVBox(
-			widget.NewLabel("🔗 Domains"),
-			wt.domainsList,
-		),
-	)
+	// Lists are now created inline in the main container
 
-	// Create main container
+	// Create main container with better proportions
 	wt.container = container.NewBorder(
-		formContainer, // top
+		container.NewScroll(formContainer), // top - scrollable form
 		container.NewVBox(
 			widget.NewLabel("📄 Website Files"),
 			wt.websiteFilesList,
 		), // bottom
-		nil,            // left
-		nil,            // right
-		listsContainer, // center
+		nil, // left
+		nil, // right
+		container.NewHSplit(
+			container.NewVBox(
+				widget.NewLabel("📋 Sites"),
+				wt.sitesList,
+			),
+			container.NewVBox(
+				widget.NewLabel("🔗 Domains"),
+				wt.domainsList,
+			),
+		), // center - use HSplit for better proportions
 	)
 
 	return wt
@@ -513,13 +512,13 @@ func (d *Dashboard) createNodeTab() *NodeTab {
 		nt.logArea,
 	)
 
-	// Create main container
+	// Create main container with better proportions
 	nt.container = container.NewBorder(
-		formContainer, // top
-		nil,           // bottom
-		nil,           // left
-		nil,           // right
-		logContainer,  // center
+		container.NewScroll(formContainer), // top - scrollable form
+		nil,                                // bottom
+		nil,                                // left
+		nil,                                // right
+		logContainer,                       // center
 	)
 
 	return nt
@@ -611,13 +610,13 @@ func (d *Dashboard) createNetworkTab() *NetworkTab {
 		),
 	)
 
-	// Create main container
+	// Create main container with better proportions
 	nt.container = container.NewBorder(
-		leftPanel,  // top
-		nil,        // bottom
-		nil,        // left
-		nil,        // right
-		rightPanel, // center
+		container.NewScroll(leftPanel), // top - scrollable panel
+		nil,                            // bottom
+		nil,                            // left
+		nil,                            // right
+		rightPanel,                     // center
 	)
 
 	return nt
