@@ -170,20 +170,12 @@ build_binaries() {
         exit 1
     fi
     
-    # Build betanet-gui (requires Linux GUI dev libs)
-    log_info "Building betanet-gui..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-gui" ./cmd/betanet-gui; then
-        log_success "betanet-gui built successfully"
+    # Build betanet-dashboard (requires Linux GUI dev libs)
+    log_info "Building betanet-dashboard..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-dashboard" ./cmd/betanet-dashboard; then
+        log_success "betanet-dashboard built successfully"
     else
-        log_warning "betanet-gui build failed (likely missing X11/OpenGL dev libs). CLI builds are ready."
-    fi
-    
-    # Build betanet-browser (requires Linux GUI dev libs)
-    log_info "Building betanet-browser..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-browser" ./cmd/betanet-browser; then
-        log_success "betanet-browser built successfully"
-    else
-        log_warning "betanet-browser build failed (likely missing X11/OpenGL dev libs)."
+        log_warning "betanet-dashboard build failed (likely missing X11/OpenGL dev libs). CLI builds are ready."
     fi
     
     # Build betanet-dashboard (requires Linux GUI dev libs)
@@ -199,7 +191,7 @@ build_binaries() {
 audit_binaries() {
     log_info "Auditing built binaries..."
     
-    for binary in betanet-node betanet-wallet betanet-gui betanet-browser betanet-dashboard; do
+    for binary in betanet-node betanet-wallet betanet-network betanet-dashboard; do
         if [ -f "$OUT_DIR/$binary" ]; then
             log_info "Auditing $binary..."
             
@@ -238,7 +230,7 @@ generate_report() {
         echo "Build Flags: $SECURITY_FLAGS"
         echo ""
         echo "Binaries Built:"
-        for binary in betanet-node betanet-wallet betanet-gui betanet-browser betanet-dashboard; do
+        for binary in betanet-node betanet-wallet betanet-network betanet-dashboard; do
             if [ -f "$OUT_DIR/$binary" ]; then
                 size=$(stat -c "%s" "$OUT_DIR/$binary")
                 echo "  $binary: $size bytes"
