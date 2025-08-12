@@ -98,7 +98,7 @@ jobs:
         echo "✅ Status report generated"
         
     - name: Upload Status Report
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: master-node-status
         path: master-node-status.md
