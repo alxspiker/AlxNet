@@ -1,2 +1,5 @@
 /bin
 /temp
+/security-audit
+coverage.html
+coverage.out

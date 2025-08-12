@@ -5,6 +5,8 @@
 [![Go Version](https://img.shields.io/badge/Go-1.23+-blue.svg)](https://golang.org)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)]()
+[![Security](https://img.shields.io/badge/Security-Hardened-red.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
 
 ## 🚀 What is Betanet?
 
@@ -17,6 +19,35 @@ Betanet is a **fully decentralized, censorship-resistant web platform** that rep
 - **🔄 Peer-to-Peer Networking** - libp2p-based distributed content delivery
 - **🔒 Content Encryption** - Optional passphrase-based content protection
 - **🎨 Rich Web Experience** - Full support for modern web technologies
+
+## 🛡️ **SECURITY & ROBUSTNESS FEATURES**
+
+### **🔒 Enterprise-Grade Security**
+- **Input Validation** - Comprehensive validation of all data structures and file paths
+- **Rate Limiting** - Configurable rate limiting to prevent abuse and DoS attacks
+- **Peer Validation** - Reputation-based peer management with automatic banning
+- **Content Size Limits** - Configurable limits to prevent resource exhaustion
+- **Path Traversal Protection** - Prevents malicious file path attacks
+- **File Extension Whitelisting** - Only allows safe, web-standard file types
+- **Memory Management** - Automatic cleanup and memory usage limits
+- **Clock Skew Protection** - Prevents timestamp-based attacks
+
+### **🛠️ Production-Ready Infrastructure**
+- **Structured Logging** - Production-grade logging with zap logger
+- **Configuration Management** - Centralized, validated configuration system
+- **Retry Logic** - Automatic retry with exponential backoff for database operations
+- **Resource Monitoring** - Memory usage tracking and automatic cleanup
+- **Error Handling** - Comprehensive error handling with detailed error messages
+- **Testing Coverage** - Extensive test suite with edge case coverage
+- **Security Auditing** - Built-in security scanning and vulnerability detection
+
+### **📊 Performance & Reliability**
+- **Connection Pooling** - Efficient database connection management
+- **Background Cleanup** - Automatic cleanup of old content and expired bans
+- **Peer Reputation System** - Intelligent peer selection and management
+- **Memory Leak Prevention** - LRU-based content cleanup and memory limits
+- **Configurable Timeouts** - Adjustable timeouts for all network operations
+- **Graceful Degradation** - System continues operating under adverse conditions
 
 ## ✨ Key Features
 
@@ -47,6 +78,42 @@ Betanet is a **fully decentralized, censorship-resistant web platform** that rep
 - **mDNS discovery** - Automatic LAN peer discovery
 - **Bootstrap support** - Manual peer connection fallback
 
+## 🛡️ **SECURITY ARCHITECTURE**
+
+### **Multi-Layer Defense**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Application Layer                        │
+│  • Input validation • Rate limiting • Access control       │
+├─────────────────────────────────────────────────────────────┤
+│                    Network Layer                            │
+│  • Peer validation • Reputation system • Connection limits │
+├─────────────────────────────────────────────────────────────┤
+│                    Storage Layer                            │
+│  • Content validation • Size limits • Path sanitization    │
+├─────────────────────────────────────────────────────────────┤
+│                    Cryptographic Layer                      │
+│  • Ed25519 signatures • Content hashing • Key derivation   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### **Security Constants & Limits**
+- **Max Content Size**: 10MB (configurable)
+- **Max File Count**: 1,000 files per website
+- **Max Path Length**: 255 characters
+- **Rate Limit**: 100 requests per minute per peer
+- **Ban Duration**: 15 minutes (configurable)
+- **Memory Limit**: 100MB per node (configurable)
+- **Max Peers**: 100 concurrent connections
+
+### **Threat Mitigation**
+- **Path Traversal**: Blocked through strict path validation
+- **Resource Exhaustion**: Prevented through size and count limits
+- **DoS Attacks**: Mitigated through rate limiting and peer banning
+- **Malicious Content**: Filtered through file type whitelisting
+- **Memory Attacks**: Prevented through usage limits and cleanup
+- **Clock Attacks**: Blocked through timestamp validation
+
 ## 🛠️ Installation
 
 ### Prerequisites
@@ -63,6 +130,13 @@ git clone https://github.com/yourusername/betanet.git
 cd betanet
 ./build.sh
 ```
+
+**The enhanced build script automatically:**
+- ✅ Runs comprehensive tests with race detection
+- ✅ Performs security scanning (gosec, staticcheck)
+- ✅ Applies security build flags (PIE, stripped binaries)
+- ✅ Generates coverage reports
+- ✅ Validates code quality
 
 ## 🚀 Quick Start
 
@@ -121,6 +195,12 @@ The core networking component that:
 - **Discovers peers** - mDNS and bootstrap peer discovery
 - **Manages websites** - Multi-file website storage and retrieval
 
+**Security Features:**
+- **Peer reputation system** - Automatic peer scoring and banning
+- **Rate limiting** - Configurable request limits per peer
+- **Memory management** - Automatic cleanup and usage limits
+- **Connection validation** - Secure peer connection handling
+
 **Commands:**
 ```bash
 # Start a node
@@ -143,6 +223,12 @@ Complete wallet system for managing multi-file websites:
 - **Manage files** - Add, update, and organize website files
 - **Register domains** - Human-readable `.bn` domain names
 - **Website metadata** - View website information and file lists
+
+**Security Features:**
+- **Strong passphrase validation** - Enforces secure password requirements
+- **Mnemonic validation** - Prevents weak seed phrases
+- **Rate limiting** - Protects against brute force attacks
+- **Automatic backups** - Configurable backup and retention policies
 
 **Commands:**
 ```bash
@@ -205,6 +291,39 @@ Desktop GUI for node and website management:
 - **Content browsing** - View and manage published websites
 
 ## 🔧 Advanced Usage
+
+### **Configuration Management**
+```bash
+# Environment-based configuration
+export BETANET_ENV=production
+export BETANET_LOG_LEVEL=warn
+export BETANET_MAX_PEERS=200
+export BETANET_MAX_CONTENT_SIZE=20971520  # 20MB
+
+# Or use configuration file
+./bin/betanet-node run -config config.yaml
+```
+
+**Example config.yaml:**
+```yaml
+environment: production
+log_level: warn
+
+network:
+  listen_addr: "/ip4/0.0.0.0/tcp/4001"
+  max_peers: 200
+  peer_timeout: 60s
+
+security:
+  max_content_size: 20971520  # 20MB
+  rate_limit: 200
+  ban_duration: 30m
+
+storage:
+  data_dir: "/var/lib/betanet"
+  max_retries: 5
+  cleanup_interval: 10m
+```
 
 ### **Multi-File Website Structure**
 ```bash
@@ -387,6 +506,19 @@ export BETANET_DEBUG=1
 # - Browser testing with full website functionality
 ```
 
+### **Security Testing**
+```bash
+# Run security tests
+go test -v ./internal/core -run TestSecurity
+
+# Run with race detection
+go test -race ./...
+
+# Run with coverage
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out -o coverage.html
+```
+
 ### **Local Development Setup**
 ```bash
 # Terminal 1: Start node A
@@ -501,6 +633,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Ed25519** - Fast, secure digital signatures
 - **BIP-39** - Mnemonic phrase standard
 - **CBOR** - Compact binary object representation
+- **zap** - Structured logging library
+- **yaml.v3** - YAML configuration parsing
 
 ## 📞 Support
 
@@ -512,4 +646,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **🌐 Betanet - Building the decentralized web with complete multi-file websites.**
 
-*Now supporting HTML, CSS, JavaScript, images, and more - all stored securely on the blockchain.*
+*Now supporting HTML, CSS, JavaScript, images, and more - all stored securely on the blockchain with enterprise-grade security features.*
