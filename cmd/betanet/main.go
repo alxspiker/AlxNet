@@ -71,7 +71,11 @@ func cmdStart() {
 	if err != nil {
 		log.Fatalf("Failed to create logger: %v", err)
 	}
-	defer logger.Sync()
+	defer func() {
+		if err := logger.Sync(); err != nil {
+			log.Printf("Failed to sync logger: %v", err)
+		}
+	}()
 
 	// Ensure data directory exists
 	if err := os.MkdirAll(*dataDir, 0755); err != nil {
@@ -132,31 +136,39 @@ func cmdStart() {
 		zap.String("port", actualNodePort))
 
 	// Start all web servers
-	servers := make([]*webserver.WebServer, 0, 3)
 
 	// 1. Browser Interface (existing functionality)
 	browserServer := webserver.NewBrowserServer(db, node, logger, mustParseInt(*browserPort))
 	if err := browserServer.Start(); err != nil {
 		log.Fatalf("Failed to start browser server: %v", err)
 	}
-	defer browserServer.Stop()
-	servers = append(servers, browserServer)
+	defer func() {
+		if err := browserServer.Stop(); err != nil {
+			logger.Error("Failed to stop browser server", zap.Error(err))
+		}
+	}()
 
 	// 2. Wallet Management Interface (new)
 	walletServer := webserver.NewWalletServer(db, node, logger, mustParseInt(*walletPort))
 	if err := walletServer.Start(); err != nil {
 		log.Fatalf("Failed to start wallet server: %v", err)
 	}
-	defer walletServer.Stop()
-	servers = append(servers, walletServer)
+	defer func() {
+		if err := walletServer.Stop(); err != nil {
+			logger.Error("Failed to stop wallet server", zap.Error(err))
+		}
+	}()
 
 	// 3. Node Management Interface (new)
 	nodeUIServer := webserver.NewNodeServer(db, node, logger, mustParseInt(*nodeUIPort))
 	if err := nodeUIServer.Start(); err != nil {
 		log.Fatalf("Failed to start node UI server: %v", err)
 	}
-	defer nodeUIServer.Stop()
-	servers = append(servers, nodeUIServer)
+	defer func() {
+		if err := nodeUIServer.Stop(); err != nil {
+			logger.Error("Failed to stop node UI server", zap.Error(err))
+		}
+	}()
 
 	logger.Info("All Betanet services started successfully!",
 		zap.String("browser_port", *browserPort),

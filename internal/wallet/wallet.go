@@ -157,7 +157,7 @@ type WalletManager struct {
 	config      *SecurityConfig
 	logger      *zap.Logger
 	rateLimiter map[string][]time.Time
-	mu          sync.RWMutex
+	mu          sync.RWMutex //nolint:unused // For future thread-safe operations
 }
 
 // NewWalletManager creates a new wallet manager with security features
@@ -227,7 +227,7 @@ func ValidatePassphrase(passphrase string, requireStrong bool) error {
 }
 
 // Rate limiting methods
-func (wm *WalletManager) checkRateLimit(identifier string) error {
+func (wm *WalletManager) checkRateLimit(identifier string) error { //nolint:unused // For future rate limiting
 	if !wm.config.EnableRateLimiting {
 		return nil
 	}

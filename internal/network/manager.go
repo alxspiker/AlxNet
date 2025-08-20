@@ -273,7 +273,11 @@ func (nm *NetworkManager) ReportPeerSuccess(peerID string, metrics NodeScore) er
 	// Add to favorites if performance is excellent
 	if metrics.CalculateScore(nil) > 0.9 {
 		if peer, exists := nm.activePeers[peerID]; exists {
-			nm.discovery.AddToFavorites(peer)
+			if err := nm.discovery.AddToFavorites(peer); err != nil {
+				nm.logger.Warn("failed to add peer to favorites",
+					zap.String("peer_id", peerID),
+					zap.Error(err))
+			}
 		}
 	}
 

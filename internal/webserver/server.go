@@ -131,7 +131,10 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
 	// Write content
-	w.Write(content)
+	if _, err := w.Write(content); err != nil {
+		http.Error(w, "Failed to write content", http.StatusInternalServerError)
+		return
+	}
 }
 
 // getWebsiteFile retrieves a file from a website
@@ -381,7 +384,10 @@ func (ws *WebServer) serveBetanetHomepage(w http.ResponseWriter, r *http.Request
 </html>`
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(homepage))
+	if _, err := w.Write([]byte(homepage)); err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleStatus serves server status information
@@ -395,7 +401,10 @@ func (ws *WebServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleAPISites lists all available sites
@@ -404,10 +413,13 @@ func (ws *WebServer) handleAPISites(w http.ResponseWriter, r *http.Request) {
 	sites := []string{}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"sites": sites,
 		"count": len(sites),
-	})
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // handleAPISite provides information about a specific site
@@ -428,7 +440,10 @@ func (ws *WebServer) handleAPISite(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(info)
+		if err := json.NewEncoder(w).Encode(info); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	} else {
 		http.Error(w, "Site not found", http.StatusNotFound)
 	}
@@ -451,5 +466,8 @@ func (ws *WebServer) handleAPIBrowse(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }

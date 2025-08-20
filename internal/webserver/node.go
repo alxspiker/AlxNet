@@ -357,7 +357,10 @@ func (ws *WebServer) handleNodeHomepage(w http.ResponseWriter, r *http.Request) 
 </html>`
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(homepage))
+	if _, err := w.Write([]byte(homepage)); err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // API Handlers for node management
@@ -381,7 +384,10 @@ func (ws *WebServer) handleNodeStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleNodePeers(w http.ResponseWriter, r *http.Request) {
@@ -411,7 +417,10 @@ func (ws *WebServer) handleNodePeers(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleNodeInfo(w http.ResponseWriter, r *http.Request) {
@@ -424,7 +433,10 @@ func (ws *WebServer) handleNodeInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(info)
+	if err := json.NewEncoder(w).Encode(info); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleStorageStats(w http.ResponseWriter, r *http.Request) {
@@ -445,7 +457,10 @@ func (ws *WebServer) handleStorageStats(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(stats)
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleStorageSites(w http.ResponseWriter, r *http.Request) {
@@ -461,7 +476,10 @@ func (ws *WebServer) handleStorageSites(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleStorageDomains(w http.ResponseWriter, r *http.Request) {
@@ -486,7 +504,10 @@ func (ws *WebServer) handleStorageDomains(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleNetworkBootstrap(w http.ResponseWriter, r *http.Request) {
@@ -498,5 +519,8 @@ func (ws *WebServer) handleNetworkBootstrap(w http.ResponseWriter, r *http.Reque
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }

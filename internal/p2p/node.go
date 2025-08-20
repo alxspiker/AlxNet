@@ -57,7 +57,7 @@ type RateLimiter struct {
 	requests    map[string][]time.Time
 	maxRequests int
 	window      time.Duration
-	mu          sync.RWMutex
+	mu          sync.RWMutex //nolint:unused // For future use
 }
 
 // PeerInfo tracks peer reputation and status
@@ -85,7 +85,7 @@ type Node struct {
 	rateLimiter    *RateLimiter
 	peers          map[peer.ID]*PeerInfo
 	bannedPeers    map[peer.ID]time.Time
-	memoryUsage    int64
+	memoryUsage    int64 //nolint:unused // For future memory monitoring
 	maxMemoryUsage int64
 	mu             sync.RWMutex
 
@@ -472,7 +472,10 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	log.Printf("handleBrowseStream: new stream from %s", s.Conn().RemotePeer())
 
 	// Set read deadline to prevent hanging
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("handleBrowseStream: failed to set read deadline: %v", err)
+		return
+	}
 
 	dec, _ := cbor.DecOptions{}.DecMode()
 	reqBytes := readAllWithTimeout(s, 5*time.Second)
@@ -485,7 +488,10 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	log.Printf("handleBrowseStream: got request type=%s siteID=%s cid=%s", req.Type, req.SiteID, req.CID)
 
 	// Set write deadline
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("handleBrowseStream: failed to set write deadline: %v", err)
+		return
+	}
 
 	switch req.Type {
 	case "get_head":
@@ -517,7 +523,7 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	}
 }
 
-func readAll(r io.Reader) []byte {
+func readAll(r io.Reader) []byte { //nolint:unused // Utility function for future use
 	buf := make([]byte, 0, 2048)
 	tmp := make([]byte, 2048)
 	for {
@@ -641,8 +647,14 @@ func (n *Node) RequestHead(ctx context.Context, p peer.AddrInfo, siteID string) 
 	defer s.Close()
 
 	// Set timeouts
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("RequestHead: failed to set write deadline: %v", err)
+		return 0, "", "", err
+	}
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("RequestHead: failed to set read deadline: %v", err)
+		return 0, "", "", err
+	}
 
 	log.Printf("RequestHead: sending request for site %s", siteID)
 	req := browseReq{Type: "get_head", SiteID: siteID}
@@ -654,7 +666,9 @@ func (n *Node) RequestHead(ctx context.Context, p peer.AddrInfo, siteID string) 
 
 	// Close write side to signal end of request
 	if closer, ok := s.(interface{ CloseWrite() error }); ok {
-		closer.CloseWrite()
+		if err := closer.CloseWrite(); err != nil {
+			log.Printf("RequestHead: failed to close write side: %v", err)
+		}
 	}
 
 	log.Printf("RequestHead: reading response")
@@ -689,8 +703,14 @@ func (n *Node) RequestContent(ctx context.Context, p peer.AddrInfo, cid string) 
 	defer s.Close()
 
 	// Set timeouts
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("RequestContent: failed to set write deadline: %v", err)
+		return nil, err
+	}
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("RequestContent: failed to set read deadline: %v", err)
+		return nil, err
+	}
 
 	req := browseReq{Type: "get_content", CID: cid}
 	b, _ := cborMarshal(req)
@@ -700,7 +720,9 @@ func (n *Node) RequestContent(ctx context.Context, p peer.AddrInfo, cid string) 
 
 	// Close write side to signal end of request
 	if closer, ok := s.(interface{ CloseWrite() error }); ok {
-		closer.CloseWrite()
+		if err := closer.CloseWrite(); err != nil {
+			log.Printf("RequestContent: failed to close write side: %v", err)
+		}
 	}
 
 	dec, _ := cbor.DecOptions{}.DecMode()
@@ -765,7 +787,7 @@ func PubHex(pub ed25519.PublicKey) string {
 }
 
 // Rate limiting methods
-func (n *Node) checkRateLimit(peerID string) bool {
+func (n *Node) checkRateLimit(peerID string) bool { //nolint:unused // For future rate limiting
 	if !n.config.EnableRateLimiting {
 		return true
 	}
@@ -822,7 +844,7 @@ func (n *Node) validatePeer(peerID peer.ID) error {
 	return nil
 }
 
-func (n *Node) banPeer(peerID peer.ID, reason string, duration time.Duration) {
+func (n *Node) banPeer(peerID peer.ID, reason string, duration time.Duration) { //nolint:unused // For future peer management
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -858,7 +880,7 @@ func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 }
 
 // Memory management methods
-func (n *Node) checkMemoryLimit() error {
+func (n *Node) checkMemoryLimit() error { //nolint:unused // For future memory management
 	n.mu.RLock()
 	defer n.mu.RUnlock()
 
@@ -868,7 +890,7 @@ func (n *Node) checkMemoryLimit() error {
 	return nil
 }
 
-func (n *Node) updateMemoryUsage(delta int64) {
+func (n *Node) updateMemoryUsage(delta int64) { //nolint:unused // For future memory tracking
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
@@ -980,18 +1002,18 @@ func (n *Node) handlePeerDisconnected(net network.Network, conn network.Conn) {
 }
 
 // Enhanced logging methods
-func (n *Node) logError(msg string, err error, fields ...zap.Field) {
+func (n *Node) logError(msg string, err error, fields ...zap.Field) { //nolint:unused // For future enhanced logging
 	n.logger.Error(msg, append(fields, zap.Error(err))...)
 }
 
-func (n *Node) logInfo(msg string, fields ...zap.Field) {
+func (n *Node) logInfo(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
 	n.logger.Info(msg, fields...)
 }
 
-func (n *Node) logDebug(msg string, fields ...zap.Field) {
+func (n *Node) logDebug(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
 	n.logger.Debug(msg, fields...)
 }
 
-func (n *Node) logWarn(msg string, fields ...zap.Field) {
+func (n *Node) logWarn(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
 	n.logger.Warn(msg, fields...)
 }

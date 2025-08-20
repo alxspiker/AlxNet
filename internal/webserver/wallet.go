@@ -481,7 +481,10 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
 </html>`
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write([]byte(homepage))
+	if _, err := w.Write([]byte(homepage)); err != nil {
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+		return
+	}
 }
 
 // API Handlers for wallet operations
@@ -515,7 +518,10 @@ func (ws *WebServer) handleCreateWallet(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleLoadWallet(w http.ResponseWriter, r *http.Request) {
@@ -549,7 +555,10 @@ func (ws *WebServer) handleLoadWallet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleWalletSites(w http.ResponseWriter, r *http.Request) {
@@ -581,7 +590,10 @@ func (ws *WebServer) handleWalletSites(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleAddSite(w http.ResponseWriter, r *http.Request) {
@@ -629,7 +641,10 @@ func (ws *WebServer) handleAddSite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handlePublishContent(w http.ResponseWriter, r *http.Request) {
@@ -725,7 +740,10 @@ func (ws *WebServer) handlePublishContent(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handlePublishWebsite(w http.ResponseWriter, r *http.Request) {
@@ -785,7 +803,10 @@ func (ws *WebServer) handleExportKey(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleRegisterDomain(w http.ResponseWriter, r *http.Request) {
@@ -840,7 +861,10 @@ func (ws *WebServer) handleRegisterDomain(w http.ResponseWriter, r *http.Request
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleListDomains(w http.ResponseWriter, r *http.Request) {
@@ -857,7 +881,10 @@ func (ws *WebServer) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleResolveDomain(w http.ResponseWriter, r *http.Request) {
@@ -880,7 +907,10 @@ func (ws *WebServer) handleResolveDomain(w http.ResponseWriter, r *http.Request)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (ws *WebServer) handleGetWebsiteInfo(w http.ResponseWriter, r *http.Request) {
@@ -930,7 +960,10 @@ func (ws *WebServer) handleGetWebsiteInfo(w http.ResponseWriter, r *http.Request
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	} else {
 		response := map[string]interface{}{
 			"success": false,
@@ -938,7 +971,10 @@ func (ws *WebServer) handleGetWebsiteInfo(w http.ResponseWriter, r *http.Request
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 
@@ -959,5 +995,8 @@ func (ws *WebServer) handleWalletStatus(w http.ResponseWriter, r *http.Request) 
 	status["node_addresses"] = addrs
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
