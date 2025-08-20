@@ -9,14 +9,18 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"betanet/internal/core"
 	"betanet/internal/p2p"
 	"betanet/internal/store"
 	"betanet/internal/wallet"
+
+	"go.uber.org/zap"
 )
 
 func main() {
@@ -50,27 +54,47 @@ func main() {
 		cmdListWebsite()
 	case "get-website-info":
 		cmdGetWebsiteInfo()
+	case "start-node":
+		cmdStartNode()
+	case "status":
+		cmdStatus()
 	default:
 		usage()
 	}
 }
 
 func usage() {
-	fmt.Println("betanet-wallet commands:")
+	fmt.Println("Betanet Wallet - Complete Wallet Management with Integrated Node")
+	fmt.Println("")
+	fmt.Println("Wallet Management:")
 	fmt.Println("  new -out /path/wallet.json")
 	fmt.Println("  add-site -wallet /path/wallet.json -mnemonic \"...\" -label mysite")
 	fmt.Println("  list -wallet /path/wallet.json -mnemonic \"...\"")
-	fmt.Println("  publish -wallet /path/wallet.json -mnemonic \"...\" -label mysite -content /path/file [-encrypt-pass \"phrase\"] [-listen ...] [-bootstrap ...] [-data /path/db]")
 	fmt.Println("  export-key -wallet /path/wallet.json -mnemonic \"...\" -label mysite")
+	fmt.Println("")
+	fmt.Println("Publishing (auto-starts node if needed):")
+	fmt.Println("  publish -wallet /path/wallet.json -mnemonic \"...\" -label mysite -content /path/file [-encrypt-pass \"phrase\"] [-port 4001] [-bootstrap ...] [-data /path/db]")
+	fmt.Println("  publish-website -wallet /path/wallet.json -mnemonic \"...\" -label mysite -dir /path/website [-main index.html] [-port 4001] [-bootstrap ...] [-data /path/db]")
+	fmt.Println("  add-website-file -wallet /path/wallet.json -mnemonic \"...\" -label mysite -path <filepath> -content /path/file [-port 4001] [-bootstrap ...] [-data /path/db]")
+	fmt.Println("")
+	fmt.Println("Website Management:")
+	fmt.Println("  list-website -wallet /path/wallet.json -mnemonic \"...\" -label mysite [-data /path/db]")
+	fmt.Println("  get-website-info -wallet /path/wallet.json -mnemonic \"...\" -label mysite [-data /path/db]")
+	fmt.Println("")
+	fmt.Println("Domain Management:")
 	fmt.Println("  register-domain -wallet /path/wallet.json -mnemonic \"...\" -label mysite -domain mydomain.bn [-data /path/db]")
 	fmt.Println("  list-domains -data /path/db")
 	fmt.Println("  resolve-domain -data /path/db -domain mydomain.bn")
 	fmt.Println("")
-	fmt.Println("Multi-file Website Commands:")
-	fmt.Println("  publish-website -wallet /path/wallet.json -mnemonic \"...\" -label mysite -dir /path/website [-main index.html] [-listen ...] [-bootstrap ...] [-data /path/db]")
-	fmt.Println("  add-website-file -wallet /path/wallet.json -mnemonic \"...\" -label mysite -path <filepath> -content /path/file [-listen ...] [-bootstrap ...] [-data /path/db]")
-	fmt.Println("  list-website -wallet /path/wallet.json -mnemonic \"...\" -label mysite [-data /path/db]")
-	fmt.Println("  get-website-info -wallet /path/wallet.json -mnemonic \"...\" -label mysite [-data /path/db]")
+	fmt.Println("Node Management:")
+	fmt.Println("  start-node [-port 4001] [-data /path/db] [-bootstrap ...] # Start a dedicated node")
+	fmt.Println("  status [-data /path/db]                                   # Check node and wallet status")
+	fmt.Println("")
+	fmt.Println("Examples:")
+	fmt.Println("  betanet-wallet new                                       # Create new wallet")
+	fmt.Println("  betanet-wallet add-site -wallet wallet.json -mnemonic \"...\" -label mysite")
+	fmt.Println("  betanet-wallet publish-website -wallet wallet.json -mnemonic \"...\" -label mysite -dir ./website")
+	fmt.Println("  betanet-wallet start-node -port 4001                     # Start node for sharing with browser")
 }
 
 func cmdNew() {
@@ -169,8 +193,8 @@ func cmdPublish() {
 	label := fs.String("label", "", "site label")
 	content := fs.String("content", "", "content file path")
 	encryptPass := fs.String("encrypt-pass", "", "encryption passphrase (optional)")
-	listen := fs.String("listen", "/ip4/0.0.0.0/tcp/0", "libp2p listen multiaddr")
-	bootstrap := fs.String("bootstrap", "", "comma-separated peer multiaddrs")
+	port := fs.String("port", "0", "P2P node port (0 = auto)")
+	bootstrap := fs.String("bootstrap", "", "bootstrap node multiaddr")
 	data := fs.String("data", "./data", "data directory")
 	_ = fs.Parse(os.Args[2:])
 
@@ -209,7 +233,14 @@ func cmdPublish() {
 	ctx := context.Background()
 	var node *p2p.Node
 	if *bootstrap != "" {
-		node, err = p2p.New(ctx, db, *listen, strings.Split(*bootstrap, ","), nil)
+		var listenAddr string
+		if *port == "0" {
+			listenAddr = "/ip4/0.0.0.0/tcp/0"
+		} else {
+			listenAddr = fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", *port)
+		}
+
+		node, err = p2p.New(ctx, db, listenAddr, strings.Split(*bootstrap, ","), nil)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -375,6 +406,8 @@ func cmdPublishWebsite() {
 	label := fs.String("label", "", "site label")
 	websiteDir := fs.String("dir", "", "path to website directory")
 	mainFile := fs.String("main", "index.html", "main entry point file")
+	port := fs.String("port", "0", "P2P node port (0 = auto)")
+	bootstrap := fs.String("bootstrap", "", "bootstrap node multiaddr")
 	data := fs.String("data", "./data", "data directory")
 	_ = fs.Parse(os.Args[2:])
 
@@ -400,6 +433,27 @@ func cmdPublishWebsite() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	// Start node if bootstrap provided
+	ctx := context.Background()
+	var node *p2p.Node
+	if *bootstrap != "" {
+		var listenAddr string
+		if *port == "0" {
+			listenAddr = "/ip4/0.0.0.0/tcp/0"
+		} else {
+			listenAddr = fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", *port)
+		}
+
+		node, err = p2p.New(ctx, db, listenAddr, strings.Split(*bootstrap, ","), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := node.Start(ctx); err != nil {
+			log.Fatal(err)
+		}
+		defer node.Host.Close()
+	}
 
 	// Create website manifest
 	manifest := &core.WebsiteManifest{
@@ -519,6 +573,142 @@ func cmdPublishWebsite() {
 	fmt.Printf("Manifest CID: %s\n", manifestCID)
 }
 
+// New node management functions
+
+func cmdStartNode() {
+	fs := flag.NewFlagSet("start-node", flag.ExitOnError)
+	port := fs.String("port", "4001", "P2P node port")
+	dataDir := fs.String("data", "./data", "data directory")
+	bootstrap := fs.String("bootstrap", "", "bootstrap node multiaddr")
+	_ = fs.Parse(os.Args[2:])
+
+	// Setup logging
+	logger, err := zap.NewDevelopment()
+	if err != nil {
+		log.Fatal("Failed to create logger:", err)
+	}
+	defer logger.Sync()
+
+	// Ensure data directory exists
+	if err := os.MkdirAll(*dataDir, 0755); err != nil {
+		log.Fatal("Failed to create data directory:", err)
+	}
+
+	// Open database
+	db, err := store.Open(*dataDir)
+	if err != nil {
+		log.Fatal("Failed to open database:", err)
+	}
+	defer db.Close()
+
+	// Setup context for graceful shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Create listen address
+	listenAddr := fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", *port)
+
+	var bootstrapPeers []string
+	if *bootstrap != "" {
+		bootstrapPeers = []string{*bootstrap}
+	}
+
+	// Create and start P2P node
+	node, err := p2p.New(ctx, db, listenAddr, bootstrapPeers, nil)
+	if err != nil {
+		log.Fatal("Failed to create P2P node:", err)
+	}
+
+	if err := node.Start(ctx); err != nil {
+		log.Fatal("Failed to start P2P node:", err)
+	}
+	defer node.Host.Close()
+
+	logger.Info("P2P node started",
+		zap.String("id", node.Host.ID().String()),
+		zap.String("port", *port))
+
+	fmt.Println("")
+	fmt.Println("🔗 Betanet Node is running!")
+	fmt.Printf("   Node ID: %s\n", node.Host.ID().String())
+	fmt.Printf("   Port: %s\n", *port)
+	fmt.Printf("   Data Directory: %s\n", *dataDir)
+	fmt.Println("")
+	fmt.Println("   This node can be used by the browser and other wallet operations")
+	fmt.Println("   Press Ctrl+C to stop")
+	fmt.Println("")
+
+	// Wait for shutdown signal
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+
+	logger.Info("Shutting down node...")
+	fmt.Println("\nShutting down...")
+}
+
+func cmdStatus() {
+	fs := flag.NewFlagSet("status", flag.ExitOnError)
+	dataDir := fs.String("data", "./data", "data directory")
+	_ = fs.Parse(os.Args[2:])
+
+	fmt.Println("Betanet Wallet Status")
+	fmt.Println("====================")
+
+	// Check if data directory exists
+	if _, err := os.Stat(*dataDir); os.IsNotExist(err) {
+		fmt.Printf("Data Directory: %s (not found)\n", *dataDir)
+		fmt.Println("Status: No data found")
+		return
+	}
+
+	fmt.Printf("Data Directory: %s ✓\n", *dataDir)
+
+	// Try to open database
+	db, err := store.Open(*dataDir)
+	if err != nil {
+		fmt.Printf("Database: Error - %v\n", err)
+		return
+	}
+	defer db.Close()
+
+	fmt.Println("Database: Connected ✓")
+
+	// Check for domains
+	domains, err := db.ListDomains()
+	if err != nil {
+		fmt.Printf("Domains: Error - %v\n", err)
+	} else {
+		fmt.Printf("Registered Domains: %d\n", len(domains))
+		for domain, siteID := range domains {
+			fmt.Printf("  %s -> %s\n", domain, siteID)
+		}
+	}
+
+	// Check for available wallets
+	walletFiles := []string{}
+	entries, err := os.ReadDir(".")
+	if err == nil {
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".json") {
+				walletFiles = append(walletFiles, entry.Name())
+			}
+		}
+	}
+
+	if len(walletFiles) > 0 {
+		fmt.Printf("Wallet Files Found: %d\n", len(walletFiles))
+		for _, file := range walletFiles {
+			fmt.Printf("  %s\n", file)
+		}
+	} else {
+		fmt.Println("Wallet Files: None found (use 'betanet-wallet new' to create)")
+	}
+
+	fmt.Println("")
+	fmt.Println("Status: Ready for wallet operations")
+}
+
 func cmdAddWebsiteFile() {
 	fs := flag.NewFlagSet("add-website-file", flag.ExitOnError)
 	wf := fs.String("wallet", "wallet.json", "wallet file")
@@ -526,6 +716,8 @@ func cmdAddWebsiteFile() {
 	label := fs.String("label", "", "site label")
 	filePath := fs.String("path", "", "file path within website (e.g., styles/main.css)")
 	contentPath := fs.String("content", "", "path to file content")
+	port := fs.String("port", "0", "P2P node port (0 = auto)")
+	bootstrap := fs.String("bootstrap", "", "bootstrap node multiaddr")
 	data := fs.String("data", "./data", "data directory")
 	_ = fs.Parse(os.Args[2:])
 
@@ -551,6 +743,27 @@ func cmdAddWebsiteFile() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+
+	// Start node if bootstrap provided
+	ctx := context.Background()
+	var node *p2p.Node
+	if *bootstrap != "" {
+		var listenAddr string
+		if *port == "0" {
+			listenAddr = "/ip4/0.0.0.0/tcp/0"
+		} else {
+			listenAddr = fmt.Sprintf("/ip4/0.0.0.0/tcp/%s", *port)
+		}
+
+		node, err = p2p.New(ctx, db, listenAddr, strings.Split(*bootstrap, ","), nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := node.Start(ctx); err != nil {
+			log.Fatal(err)
+		}
+		defer node.Host.Close()
+	}
 
 	// Generate content CID
 	contentCID := core.CIDForContent(content)
