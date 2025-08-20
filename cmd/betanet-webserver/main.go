@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"syscall"
 
-	"betanet/internal/store"
 	"betanet/internal/p2p"
+	"betanet/internal/store"
 	"betanet/internal/webserver"
 
 	"go.uber.org/zap"
@@ -94,7 +94,7 @@ func serveCommand() {
 	}
 	defer webServer.Stop()
 
-	logger.Info("Betanet web server started", 
+	logger.Info("Betanet web server started",
 		zap.Int("port", portInt),
 		zap.String("url", fmt.Sprintf("http://localhost:%d", portInt)))
 

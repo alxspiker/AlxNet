@@ -20,19 +20,19 @@ import (
 
 // WebServer serves decentralized websites over HTTP
 type WebServer struct {
-	store      *store.Store
-	node       *p2p.Node
-	logger     *zap.Logger
-	server     *http.Server
-	port       int
-	ctx        context.Context
-	cancel     context.CancelFunc
+	store  *store.Store
+	node   *p2p.Node
+	logger *zap.Logger
+	server *http.Server
+	port   int
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 // NewWebServer creates a new web server instance
 func NewWebServer(store *store.Store, node *p2p.Node, logger *zap.Logger, port int) *WebServer {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	ws := &WebServer{
 		store:  store,
 		node:   node,
@@ -86,7 +86,7 @@ func (ws *WebServer) Stop() error {
 func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 	// Parse the URL to extract site ID and file path
 	urlParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
-	
+
 	if len(urlParts) == 0 || urlParts[0] == "" {
 		ws.serveBetanetHomepage(w, r)
 		return
@@ -94,7 +94,7 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 
 	siteID := urlParts[0]
 	filePath := "index.html"
-	
+
 	if len(urlParts) > 1 {
 		filePath = strings.Join(urlParts[1:], "/")
 	}
@@ -105,14 +105,14 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ws.logger.Info("serving website content", 
+	ws.logger.Info("serving website content",
 		zap.String("site_id", siteID),
 		zap.String("file_path", filePath))
 
 	// Try to get the website content
 	content, mimeType, err := ws.getWebsiteFile(siteID, filePath)
 	if err != nil {
-		ws.logger.Error("failed to get website file", 
+		ws.logger.Error("failed to get website file",
 			zap.String("site_id", siteID),
 			zap.String("file_path", filePath),
 			zap.Error(err))
@@ -124,7 +124,7 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("X-Betanet-Site-ID", siteID)
 	w.Header().Set("X-Betanet-File-Path", filePath)
-	
+
 	// Enable CORS for API access
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
@@ -222,7 +222,7 @@ func (ws *WebServer) getSingleFileContent(siteID string) ([]byte, string, error)
 func (ws *WebServer) getMimeType(filePath string) string {
 	ext := filepath.Ext(filePath)
 	mimeType := mime.TypeByExtension(ext)
-	
+
 	if mimeType == "" {
 		switch ext {
 		case ".html", ".htm":
@@ -247,7 +247,7 @@ func (ws *WebServer) getMimeType(filePath string) string {
 			return "text/plain; charset=utf-8"
 		}
 	}
-	
+
 	return mimeType
 }
 
@@ -402,7 +402,7 @@ func (ws *WebServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 func (ws *WebServer) handleAPISites(w http.ResponseWriter, r *http.Request) {
 	// This would need implementation to list all sites from the store
 	sites := []string{}
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"sites": sites,
@@ -413,7 +413,7 @@ func (ws *WebServer) handleAPISites(w http.ResponseWriter, r *http.Request) {
 // handleAPISite provides information about a specific site
 func (ws *WebServer) handleAPISite(w http.ResponseWriter, r *http.Request) {
 	siteID := strings.TrimPrefix(r.URL.Path, "/api/site/")
-	
+
 	if len(siteID) != 64 {
 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
 		return
@@ -426,7 +426,7 @@ func (ws *WebServer) handleAPISite(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to get site info", http.StatusInternalServerError)
 			return
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(info)
 	} else {
@@ -437,7 +437,7 @@ func (ws *WebServer) handleAPISite(w http.ResponseWriter, r *http.Request) {
 // handleAPIBrowse provides a browsing interface for sites
 func (ws *WebServer) handleAPIBrowse(w http.ResponseWriter, r *http.Request) {
 	siteID := strings.TrimPrefix(r.URL.Path, "/api/browse/")
-	
+
 	if len(siteID) != 64 {
 		http.Error(w, "Invalid site ID", http.StatusBadRequest)
 		return

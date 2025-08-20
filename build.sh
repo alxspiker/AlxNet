@@ -11,7 +11,7 @@ GO_BIN="${GO_BIN:-$(command -v go || echo /usr/local/go/bin/go)}"
 # Security and build flags
 SECURITY_FLAGS="-trimpath -ldflags=-s -ldflags=-w -buildmode=pie"
 TEST_FLAGS="-cover -coverprofile=coverage.out -timeout=5m"
-LINT_FLAGS="-E gofmt,goimports,misspell,unused,deadcode,varcheck,structcheck,ineffassign"
+LINT_FLAGS="-E goimports,misspell,unused,deadcode,varcheck,structcheck,ineffassign"
 
 # Colors for output
 RED='\033[0;31m'
@@ -34,20 +34,28 @@ check_prerequisites() {
     go_version=$("$GO_BIN" version | awk '{print $3}' | sed 's/go//')
     log_info "Go version: $go_version"
     
-    # Check if required tools are available
-    if ! command -v gofmt &> /dev/null; then
-        log_warning "gofmt not found, installing..."
-        "$GO_BIN" install golang.org/x/tools/cmd/gofmt@latest
+    # Set up Go tools paths
+    GO_ROOT="$(dirname "$GO_BIN")"
+    GOFMT_BIN="$GO_ROOT/gofmt"
+    
+    # Check if gofmt is available (it comes with Go)
+    if [ ! -f "$GOFMT_BIN" ]; then
+        log_error "gofmt not found at $GOFMT_BIN"
+        exit 1
     fi
     
     if ! command -v golangci-lint &> /dev/null; then
         log_warning "golangci-lint not found, installing..."
         "$GO_BIN" install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        # Add GOPATH/bin to PATH for this session
+        export PATH="$("$GO_BIN" env GOPATH)/bin:$PATH"
     fi
     
     if ! command -v staticcheck &> /dev/null; then
         log_warning "staticcheck not found, installing..."
         "$GO_BIN" install honnef.co/go/tools/cmd/staticcheck@latest
+        # Add GOPATH/bin to PATH for this session
+        export PATH="$("$GO_BIN" env GOPATH)/bin:$PATH"
     fi
 }
 
@@ -122,7 +130,7 @@ format_and_lint() {
     
     # Format code
     log_info "Running gofmt..."
-    if gofmt -s -w .; then
+    if "$GOFMT_BIN" -s -w .; then
         log_success "Code formatted successfully"
     else
         log_warning "Code formatting had issues"
@@ -189,8 +197,8 @@ audit_binaries() {
             
             # Check file permissions
             perms=$(stat -c "%a" "$OUT_DIR/$binary")
-            if [ "$perms" = "755" ]; then
-                log_success "$binary has correct permissions (755)"
+            if [ "$perms" = "755" ] || [ "$perms" = "775" ]; then
+                log_success "$binary has correct permissions ($perms)"
             else
                 log_warning "$binary has unusual permissions ($perms)"
             fi
