@@ -132,196 +132,74 @@ cd betanet
 
 ## 🚀 Quick Start
 
-### 🌐 **Global Discovery Network** - Cross-Internet Connectivity
-The global discovery network enables nodes to connect across the internet using:
-- **GitHub Master List** - Always-available curated master nodes
-- **Local Peer Favorites** - User-curated reliable peers
-- **Dynamic Discovery** - Automatic peer discovery and scoring
-- **Intelligent Selection** - Consensus-based peer optimization
+### 🌐 **Single Unified Command** - Complete Platform Integration
+
+**Start the complete Betanet platform with one command:**
 
 ```bash
-# Check network status
-./bin/betanet-network -command status
+# Start the complete platform (all services integrated)
+./betanet start
 
-# Discover peers globally
-./bin/betanet-network -command discover
-
-# List available peers
-./bin/betanet-network -command peers -limit 10
-
-# Monitor network health
-./bin/betanet-network -command health
-
-# Refresh network data
-./bin/betanet-network -command refresh
+# Or customize ports for multiple instances
+./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 ```
 
-### 1. **Launch the Unified Dashboard**
-```bash
-# Launch the complete system management interface
-./launch-dashboard.sh
+**🎯 What happens when you run `betanet start`:**
+- **P2P Network Node** automatically starts on port 4001 (or specified port)
+- **🌐 Browser Interface** launches at http://localhost:8080 - Browse decentralized websites
+- **💰 Wallet Management** launches at http://localhost:8081 - Create/manage wallets and sites  
+- **🔗 Node Dashboard** launches at http://localhost:8082 - Monitor P2P node status
 
-# Or launch directly
-./bin/betanet-dashboard
-```
+### **Creating Your First Website**
 
-### 2. **Create a Multi-File Website**
-```bash
-# Create a website directory
-mkdir -p mywebsite/{css,js,images}
-
-# Create your website files
-echo "<!DOCTYPE html><html><head><title>My Site</title><link rel='stylesheet' href='css/style.css'></head><body><h1>Hello World!</h1><script src='js/app.js'></script></body></html>" > mywebsite/index.html
-echo "body { font-family: Arial; color: #333; }" > mywebsite/css/style.css
-echo "console.log('Hello from JavaScript!');" > mywebsite/js/app.js
-```
-
-### 3. **Use the Dashboard to Publish**
-- **Wallet Tab**: Create wallet, add site, publish content
-- **Node Tab**: Start node, manage network operations
-- **Network Tab**: Monitor peers and network health
-- **Browser Tab**: Browse your published website
-
+1. **Start Betanet**: `./betanet start`
+2. **Open Wallet Interface**: Navigate to http://localhost:8081
+3. **Create Wallet**: Click "Create New Wallet" → Save the mnemonic phrase securely
+4. **Navigate to Sites**: Click "Sites" tab → Create your first site
+5. **Open Editor**: Click "Editor" tab → Add files (index.html, style.css, etc.)
+6. **Publish**: Click "Publish Site" to deploy to the decentralized network
+7. **Browse**: Visit http://localhost:8080 and enter your site ID to view
 ## 🎯 Core Components
 
-### **🌐 betanet-dashboard** - Unified System Management
-The **single, unified interface** that provides access to all system operations:
+### **🚀 betanet** - Unified Platform Command
 
-**💼 Wallet Tab - Complete Wallet Management**
-- Create wallets with mnemonic generation
-- Add sites and manage cryptographic keys
-- Publish content (encrypted or plain)
-- Register `.bn` domains
-- Publish complete multi-file websites
-- Add individual files to websites
-- Export private keys
+The **single command** that provides the complete Betanet experience:
 
-**🖥️ Node Tab - Full Node Control**
-- Initialize cryptographic keys
-- Start/stop network nodes
-- Publish content and websites
-- Browse sites and add files
-- Real-time node status and logs
+**🌐 Browser Interface (Port 8080)**
+- Browse decentralized websites by Site ID
+- Rich content rendering (HTML, CSS, JavaScript, images)
+- Navigation controls and multi-site support
+- Automatic P2P node integration
 
-**🌐 Network Tab - Network Management**
-- Start/stop network services
-- Discover peers automatically
-- Monitor network health and status
-- View connected peers and statistics
-- Real-time network monitoring
+**💰 Wallet Management Interface (Port 8081)**  
+- **Professional multi-screen workflow**: Wallet → Sites → Editor
+- **Visual file management**: File tree, syntax-aware editor, add/delete files
+- **Wallet operations**: Create wallets with mnemonic generation, secure storage
+- **Site management**: Create sites, manage cryptographic keys
+- **Multi-file publishing**: Complete website publishing with HTML/CSS/JS/images
+- **Domain registration**: Human-readable `.bn` domain names
 
-**🌍 Browser Tab - Web Browsing**
-- Navigate to site IDs or `.bn` domains
-- Browse decentralized websites
-- Multi-tab support
-- Navigation history (back/forward)
-- Rich content rendering
+**🔗 Node Management Interface (Port 8082)**
+- **Real-time P2P monitoring**: Live node status and connection metrics  
+- **Peer management**: Connected peers display with auto-refresh
+- **Storage statistics**: Network health and protocol information
+- **Performance tracking**: Uptime monitoring and network statistics
 
-### **betanet-node** - Network Node
-The core networking component that:
-- **Runs the P2P network** - Handles peer connections and content distribution
-- **Stores content** - BadgerDB-based persistent storage
-- **Validates updates** - Cryptographic signature verification
-- **Discovers peers** - mDNS and bootstrap peer discovery
-- **Manages websites** - Multi-file website storage and retrieval
-
-**Security Features:**
-- **Peer reputation system** - Automatic peer scoring and banning
-- **Rate limiting** - Configurable request limits per peer
-- **Memory management** - Automatic cleanup and usage limits
-- **Connection validation** - Secure peer connection handling
-
-**Commands:**
-```bash
-# Start a node
-./bin/betanet-node run -data /path/to/db -listen /ip4/0.0.0.0/tcp/4001
-
-# Publish a multi-file website
-./bin/betanet-node publish-website -key /path/to/key -data /path/to/db -dir /path/website
-
-# Add files to existing website
-./bin/betanet-node add-file -key /path/to/key -data /path/to/db -path css/style.css -content /path/file
-
-# List website contents
-./bin/betanet-node list-website -data /path/to/db -site <siteID>
-```
-
-### **betanet-wallet** - Website Management
-Complete wallet system for managing multi-file websites:
-- **Create sites** - Deterministic key derivation from mnemonic
-- **Publish websites** - Complete multi-file website publishing
-- **Manage files** - Add, update, and organize website files
-- **Register domains** - Human-readable `.bn` domain names
-- **Website metadata** - View website information and file lists
-
-**Security Features:**
-- **Strong passphrase validation** - Enforces secure password requirements
-- **Mnemonic validation** - Prevents weak seed phrases
-- **Rate limiting** - Protects against brute force attacks
-- **Automatic backups** - Configurable backup and retention policies
-
-**Commands:**
-```bash
-# Create new wallet
-./bin/betanet-wallet new -out wallet.json
-
-# Add a site
-./bin/betanet-wallet add-site -wallet wallet.json -mnemonic "..." -label mysite
-
-# Publish multi-file website
-./bin/betanet-wallet publish-website -wallet wallet.json -mnemonic "..." -label mysite -dir /path/website
-
-# Add files to existing website
-./bin/betanet-wallet add-website-file -wallet wallet.json -mnemonic "..." -label mysite -path css/style.css -content /path/file
-
-# List website contents
-./bin/betanet-wallet list-website -wallet wallet.json -mnemonic "..." -label mysite
-
-# Get website information
-./bin/betanet-wallet get-website-info -wallet wallet.json -mnemonic "..." -label mysite
-
-# Register domain
-./bin/betanet-wallet register-domain -wallet wallet.json -mnemonic "..." -label mysite -domain mysite.bn
-```
-
-### **betanet-network** - Global Discovery Network
-The comprehensive global discovery system that enables cross-internet connectivity:
-- **Master List Management** - GitHub-based curated master nodes
-- **Consensus Engine** - Intelligent peer scoring and selection
-- **Discovery Service** - Multi-source peer discovery (GitHub, local, mDNS)
-- **Load Balancing** - Geographic and performance-based peer distribution
-- **Fault Tolerance** - Automatic failover and peer switching
-
-**Key Features:**
-- **Hybrid Discovery** - Combines curated lists with dynamic discovery
-- **Consensus Scoring** - Multi-factor peer reliability assessment
-- **Geographic Optimization** - Location-aware peer selection
-- **Real-time Health Monitoring** - Network status and performance metrics
-- **Seamless Integration** - Works with existing P2P nodes
-
-**Architecture:**
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   GitHub        │    │   Local         │    │   Dynamic       │
-│   Master List   │───▶│   Favorites     │───▶│   Discovery     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Consensus Engine                             │
-│  • Peer Scoring    • Load Balancing    • Fault Tolerance      │
-│  • Geographic Opt  • Performance Opt   • Auto-failover        │
-└─────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    Network Manager                              │
-│  • Service Coordination  • Health Monitoring  • Peer Mgmt      │
-│  • Status Reporting      • Configuration      • Integration    │
-└─────────────────────────────────────────────────────────────────┘
-```
-
+**⚡ Integrated P2P Node** 
+- **Automatic startup**: Shared P2P node across all interfaces
+- **Peer discovery**: mDNS and bootstrap peer discovery  
+- **Content storage**: BadgerDB-based persistent storage with multi-file website support
+- **Security features**: Rate limiting, peer validation, memory management
 ## 🔧 Advanced Usage
+
+### **Multi-Instance Development Setup**
+```bash
+# Start first instance (development)
+./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
+
+# Start second instance (testing) 
+./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
+```
 
 ### **Configuration Management**
 ```bash
@@ -391,11 +269,10 @@ echo "console.log('...');" > mywebsite/js/app.js
 
 ### **Domain Name System**
 ```bash
-# List all registered domains
-./bin/betanet-wallet list-domains -data /path/to/db
-
-# Resolve a domain
-./bin/betanet-wallet resolve-domain -data /path/to/db -domain mysite.bn
+# All domain management is now done through the web interface:
+# 1. Start Betanet: ./betanet start  
+# 2. Open Wallet Management: http://localhost:8081
+# 3. Create/load wallet → Create site → Register domain through UI
 
 # Domain format validation
 # ✅ Valid: mysite.bn, blog123.bn, news2024.bn
@@ -404,37 +281,41 @@ echo "console.log('...');" > mywebsite/js/app.js
 
 ### **Content Encryption**
 ```bash
-# Publish encrypted content using the dashboard
-# Navigate to Wallet Tab → Publish Content → Enter encryption passphrase
-
-# Decrypt content when browsing
-./bin/betanet-node browse \
-  -data /path/to/db \
-  -site <siteID> \
-  -decrypt-pass "secret phrase"
+# All content publishing is now done through the integrated web interface:
+# 1. Open Wallet Management: http://localhost:8081
+# 2. Navigate to Editor tab → Create files → Publish
+# 3. Encryption options available in the publishing interface
 ```
 
 ### **Network Configuration**
 ```bash
-# Start node with bootstrap peers
-./bin/betanet-node run \
-  -data /path/to/db \
-  -listen /ip4/0.0.0.0/tcp/4001 \
-  -bootstrap /ip4/127.0.0.1/tcp/4002/p2p/12D3KooW...
+# Start with custom node configuration
+./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 
-# Connect multiple nodes
-./bin/betanet-node run -data /tmp/node2 -listen /ip4/0.0.0.0/tcp/4002 -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
+# Connect to specific bootstrap peer (bootstrap peer management through Node UI)
+./betanet start -bootstrap /ip4/127.0.0.1/tcp/4002/p2p/12D3KooW...
+
+# Start second instance for testing
+./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 ```
 
 ## 🏗️ Architecture
 
-### **Core Components**
+### **Unified Platform Architecture**
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   betanet-node  │    │ betanet-wallet  │    │ betanet-network │
-│   (P2P Node)    │    │ (Website Mgmt)  │    │ (Discovery)     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
+┌─────────────────────────────────────────────────────────────────┐
+│                        betanet start                           │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │   Browser UI    │  │   Wallet UI     │  │   Node UI       │ │
+│  │   (Port 8080)   │  │   (Port 8081)   │  │   (Port 8082)   │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+│                                │                               │
+│                    ┌─────────────────┐                        │
+│                    │   Shared P2P    │                        │
+│                    │   Node Core     │                        │
+│                    │   (Port 4001)   │                        │
+│                    └─────────────────┘                        │
+└─────────────────────────────────────────────────────────────────┘
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
@@ -469,60 +350,62 @@ echo "console.log('...');" > mywebsite/js/app.js
 
 ### **Common Issues**
 
-**"Cannot acquire directory lock"**
+**"Port already in use"**
 ```bash
-# Kill any running nodes
-pkill -f betanet-node
+# Kill any running Betanet instances
+pkill -f betanet
 
-# Use different data directories
-./bin/betanet-node run -data /tmp/node1 -listen /ip4/0.0.0.0/tcp/4001
-./bin/betanet-node run -data /tmp/node2 -listen /ip4/0.0.0.0/tcp/4002
+# Start with different ports
+./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 ```
 
-**"No peers found"**
+**"Cannot connect to peer network"**
 ```bash
-# Check node is running and copy address
-./bin/betanet-node run -data /tmp/node -listen /ip4/0.0.0.0/tcp/4001
-# Copy the "addr:" line and use as bootstrap
+# Check if Betanet is running
+./betanet start
 
-# Use bootstrap address
-./bin/betanet-node browse -data /tmp/browse -site <siteID> -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
+# Monitor node status through Node Management interface
+# Open: http://localhost:8082
+
+# Use bootstrap peers for testing
+./betanet start -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
 ```
 
 **"Website files not loading"**
 ```bash
-# Check website manifest
-./bin/betanet-wallet get-website-info -wallet wallet.json -mnemonic "..." -label mysite
-
-# Verify all files are published
-./bin/betanet-wallet list-website -wallet wallet.json -mnemonic "..." -label mysite
-
-# Check file paths match manifest
-./bin/betanet-wallet add-website-file -wallet wallet.json -mnemonic "..." -label mysite -path css/style.css -content /path/file
+# All website management is now through the web interface:
+# 1. Open Wallet Management: http://localhost:8081  
+# 2. Load your wallet and navigate to Editor tab
+# 3. Verify all files are present in the file tree
+# 4. Use "Publish Site" to update the network
 ```
 
 ### **Debug Mode**
 ```bash
 # Enable verbose logging
 export BETANET_DEBUG=1
-./bin/betanet-node run -data /tmp/node -listen /ip4/0.0.0.0/tcp/4001
+./betanet start
 
-# Check network status
-./bin/betanet-node browse -data /tmp/browse -site <siteID> -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
+# Monitor through web interfaces:
+# - Node status: http://localhost:8082
+# - Network health: Real-time monitoring available in Node UI
 ```
 
 ## 🧪 Testing
 
-### **🤖 Automated GitHub Actions Testing**
-Your Betanet master node is **continuously tested** by GitHub Actions from worldwide locations:
+### **🤖 Automated Playwright Testing**
+The unified web interface is **continuously tested** with Playwright:
 
-- **🌐 Cross-Internet Validation** - Tests global accessibility and peer discovery
-- **🤖 Automated Testing** - Runs on every push to the network folder
-- **📊 Real-Time Monitoring** - Continuous validation of network health
-- **🌍 Global Simulation** - Tests from multiple geographic locations
-- **🛡️ Production Validation** - Ensures enterprise-grade reliability
+- **🌐 UI Integration Testing** - Tests complete wallet → sites → editor workflow
+- **🤖 Automated E2E Testing** - Validates all user interactions
+- **📊 Real-Time Monitoring** - Continuous validation of web interface functionality
+- **🌍 Cross-Browser Testing** - Ensures compatibility across all browsers
+- **🛡️ Production Validation** - Ensures enterprise-grade UI reliability
 
-**View live testing:** [GitHub Actions](https://github.com/alxspiker/betanet/actions)
+**Run tests locally:**
+```bash
+npm test
+```
 
 ### **Security Testing**
 ```bash
@@ -539,15 +422,15 @@ go tool cover -html=coverage.out -o coverage.html
 
 ### **Local Development Setup**
 ```bash
-# Terminal 1: Start node A
-./bin/betanet-node run -data /tmp/nodeA -listen /ip4/0.0.0.0/tcp/4001
+# Terminal 1: Start first Betanet instance (development)
+./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 
-# Terminal 2: Start node B with bootstrap
-./bin/betanet-node run -data /tmp/nodeB -listen /ip4/0.0.0.0/tcp/4002 -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
+# Terminal 2: Start second instance (testing)  
+./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 
-# Terminal 3: Launch dashboard
-./launch-dashboard.sh
-# Use the dashboard to create and publish websites
+# Open web interfaces:
+# Instance 1: http://localhost:8081 (wallet), http://localhost:8080 (browser)
+# Instance 2: http://localhost:8091 (wallet), http://localhost:8090 (browser)
 ```
 
 ## 📚 API Reference
