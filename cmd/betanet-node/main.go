@@ -642,10 +642,22 @@ func publishWebsite() {
 		}
 		fileRecord.UpdateSig = ed25519.Sign(fileUpdatePriv, fileRecordData)
 
+		// Create complete file record with signature
+		fullFileRecordData, err := core.CanonicalMarshalFileRecord(fileRecord)
+		if err != nil {
+			return err
+		}
+
 		// Store file record
 		fileRecordCID := core.CIDForBytes(fileRecordData)
-		if err := db.PutRecord(fileRecordCID, fileRecordData); err != nil {
+		if err := db.PutRecord(fileRecordCID, fullFileRecordData); err != nil {
 			return fmt.Errorf("failed to store file record for %s: %v", relPath, err)
+		}
+
+		// Store file record mapping for the website
+		siteID := core.SiteIDFromPub(pub)
+		if err := db.PutFileRecord(siteID, relPath, fileRecordCID, fullFileRecordData); err != nil {
+			return fmt.Errorf("failed to store file record mapping for %s: %v", relPath, err)
 		}
 
 		// Add to manifest
@@ -667,21 +679,27 @@ func publishWebsite() {
 	manifest.UpdatePub = manifestUpdatePub
 
 	// Sign manifest
-	manifestData, err := core.CanonicalMarshalWebsiteManifestNoUpdateSig(manifest)
+	manifestDataForSigning, err := core.CanonicalMarshalWebsiteManifestNoUpdateSig(manifest)
 	if err != nil {
 		log.Fatal(err)
 	}
-	manifest.UpdateSig = ed25519.Sign(manifestUpdatePriv, manifestData)
+	manifest.UpdateSig = ed25519.Sign(manifestUpdatePriv, manifestDataForSigning)
+
+	// Marshal complete manifest with signature
+	fullManifestData, err := core.CanonicalMarshalWebsiteManifest(manifest)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Store manifest
-	manifestCID := core.CIDForBytes(manifestData)
-	if err := db.PutRecord(manifestCID, manifestData); err != nil {
+	manifestCID := core.CIDForBytes(manifestDataForSigning)
+	if err := db.PutRecord(manifestCID, fullManifestData); err != nil {
 		log.Fatal("failed to store manifest record")
 	}
 
 	// Store website manifest in store
 	siteID := core.SiteIDFromPub(pub)
-	if err := db.PutWebsiteManifest(siteID, manifestCID, manifestData); err != nil {
+	if err := db.PutWebsiteManifest(siteID, manifestCID, fullManifestData); err != nil {
 		log.Fatal("failed to store website manifest")
 	}
 
