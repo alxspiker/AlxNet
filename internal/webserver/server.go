@@ -18,7 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// WebServer serves decentralized websites over HTTP
+// WebServer serves web interfaces for Betanet
 type WebServer struct {
 	store  *store.Store
 	node   *p2p.Node
@@ -29,8 +29,8 @@ type WebServer struct {
 	cancel context.CancelFunc
 }
 
-// NewWebServer creates a new web server instance
-func NewWebServer(store *store.Store, node *p2p.Node, logger *zap.Logger, port int) *WebServer {
+// NewBrowserServer creates a new browser web server instance
+func NewBrowserServer(store *store.Store, node *p2p.Node, logger *zap.Logger, port int) *WebServer {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	ws := &WebServer{

@@ -151,30 +151,12 @@ build_binaries() {
     log_info "Building binaries with security enhancements..."
     mkdir -p "$OUT_DIR"
     
-    # Build betanet-node
-    log_info "Building betanet-node..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-node" ./cmd/betanet-node; then
-        log_success "betanet-node built successfully"
+    # Build betanet (single unified command)
+    log_info "Building betanet..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet" ./cmd/betanet; then
+        log_success "betanet built successfully"
     else
-        log_error "Failed to build betanet-node!"
-        exit 1
-    fi
-    
-    # Build betanet-wallet
-    log_info "Building betanet-wallet..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-wallet" ./cmd/betanet-wallet; then
-        log_success "betanet-wallet built successfully"
-    else
-        log_error "Failed to build betanet-wallet!"
-        exit 1
-    fi
-    
-    # Build betanet-browser
-    log_info "Building betanet-browser..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-browser" ./cmd/betanet-browser; then
-        log_success "betanet-browser built successfully"
-    else
-        log_error "Failed to build betanet-browser!"
+        log_error "Failed to build betanet!"
         exit 1
     fi
 }
@@ -183,7 +165,7 @@ build_binaries() {
 audit_binaries() {
     log_info "Auditing built binaries..."
     
-    for binary in betanet-node betanet-wallet betanet-browser; do
+    for binary in betanet; do
         if [ -f "$OUT_DIR/$binary" ]; then
             log_info "Auditing $binary..."
             
@@ -222,7 +204,7 @@ generate_report() {
         echo "Build Flags: $SECURITY_FLAGS"
         echo ""
         echo "Binaries Built:"
-        for binary in betanet-node betanet-wallet betanet-browser; do
+        for binary in betanet; do
             if [ -f "$OUT_DIR/$binary" ]; then
                 size=$(stat -c "%s" "$OUT_DIR/$binary")
                 echo "  $binary: $size bytes"
