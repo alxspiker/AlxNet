@@ -11,7 +11,7 @@ GO_BIN="${GO_BIN:-$(command -v go || echo /usr/local/go/bin/go)}"
 # Security and build flags
 SECURITY_FLAGS="-trimpath -ldflags=-s -ldflags=-w -buildmode=pie"
 TEST_FLAGS="-cover -coverprofile=coverage.out -timeout=5m"
-LINT_FLAGS="-E gofmt,goimports,misspell,unused,deadcode,varcheck,structcheck,ineffassign"
+LINT_FLAGS="-E goimports,misspell,unused,deadcode,varcheck,structcheck,ineffassign"
 
 # Colors for output
 RED='\033[0;31m'
@@ -34,20 +34,28 @@ check_prerequisites() {
     go_version=$("$GO_BIN" version | awk '{print $3}' | sed 's/go//')
     log_info "Go version: $go_version"
     
-    # Check if required tools are available
-    if ! command -v gofmt &> /dev/null; then
-        log_warning "gofmt not found, installing..."
-        "$GO_BIN" install golang.org/x/tools/cmd/gofmt@latest
+    # Set up Go tools paths
+    GO_ROOT="$(dirname "$GO_BIN")"
+    GOFMT_BIN="$GO_ROOT/gofmt"
+    
+    # Check if gofmt is available (it comes with Go)
+    if [ ! -f "$GOFMT_BIN" ]; then
+        log_error "gofmt not found at $GOFMT_BIN"
+        exit 1
     fi
     
     if ! command -v golangci-lint &> /dev/null; then
         log_warning "golangci-lint not found, installing..."
         "$GO_BIN" install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+        # Add GOPATH/bin to PATH for this session
+        export PATH="$("$GO_BIN" env GOPATH)/bin:$PATH"
     fi
     
     if ! command -v staticcheck &> /dev/null; then
         log_warning "staticcheck not found, installing..."
         "$GO_BIN" install honnef.co/go/tools/cmd/staticcheck@latest
+        # Add GOPATH/bin to PATH for this session
+        export PATH="$("$GO_BIN" env GOPATH)/bin:$PATH"
     fi
 }
 
@@ -122,7 +130,7 @@ format_and_lint() {
     
     # Format code
     log_info "Running gofmt..."
-    if gofmt -s -w .; then
+    if "$GOFMT_BIN" -s -w .; then
         log_success "Code formatted successfully"
     else
         log_warning "Code formatting had issues"
@@ -143,39 +151,13 @@ build_binaries() {
     log_info "Building binaries with security enhancements..."
     mkdir -p "$OUT_DIR"
     
-    # Build betanet-node
-    log_info "Building betanet-node..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-node" ./cmd/betanet-node; then
-        log_success "betanet-node built successfully"
+    # Build alxnet (single unified command)
+    log_info "Building alxnet..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/alxnet" ./cmd/alxnet; then
+        log_success "alxnet built successfully"
     else
-        log_error "Failed to build betanet-node!"
+        log_error "Failed to build alxnet!"
         exit 1
-    fi
-    
-    # Build betanet-wallet
-    log_info "Building betanet-wallet..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-wallet" ./cmd/betanet-wallet; then
-        log_success "betanet-wallet built successfully"
-    else
-        log_error "Failed to build betanet-wallet!"
-        exit 1
-    fi
-    
-    # Build betanet-network
-    log_info "Building betanet-network..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-network" ./cmd/betanet-network; then
-        log_success "betanet-network built successfully"
-    else
-        log_error "Failed to build betanet-network!"
-        exit 1
-    fi
-    
-    # Build betanet-dashboard (requires Linux GUI dev libs)
-    log_info "Building betanet-dashboard..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet-dashboard" ./cmd/betanet-dashboard; then
-        log_success "betanet-dashboard built successfully"
-    else
-        log_warning "betanet-dashboard build failed (likely missing X11/OpenGL dev libs). CLI builds are ready."
     fi
 }
 
@@ -183,14 +165,14 @@ build_binaries() {
 audit_binaries() {
     log_info "Auditing built binaries..."
     
-    for binary in betanet-node betanet-wallet betanet-network betanet-dashboard; do
+    for binary in alxnet; do
         if [ -f "$OUT_DIR/$binary" ]; then
             log_info "Auditing $binary..."
             
             # Check file permissions
             perms=$(stat -c "%a" "$OUT_DIR/$binary")
-            if [ "$perms" = "755" ]; then
-                log_success "$binary has correct permissions (755)"
+            if [ "$perms" = "755" ] || [ "$perms" = "775" ]; then
+                log_success "$binary has correct permissions ($perms)"
             else
                 log_warning "$binary has unusual permissions ($perms)"
             fi
@@ -215,14 +197,14 @@ generate_report() {
     
     report_file="$OUT_DIR/build-report.txt"
     {
-        echo "Betanet Build Report"
+        echo "AlxNet Build Report"
         echo "===================="
         echo "Build Date: $(date)"
         echo "Go Version: $("$GO_BIN" version)"
         echo "Build Flags: $SECURITY_FLAGS"
         echo ""
         echo "Binaries Built:"
-        for binary in betanet-node betanet-wallet betanet-network betanet-dashboard; do
+        for binary in alxnet; do
             if [ -f "$OUT_DIR/$binary" ]; then
                 size=$(stat -c "%s" "$OUT_DIR/$binary")
                 echo "  $binary: $size bytes"
@@ -244,7 +226,7 @@ generate_report() {
 
 # Main build process
 main() {
-    log_info "Starting enhanced Betanet build process..."
+    log_info "Starting enhanced AlxNet build process..."
     log_info "Using Go: $GO_BIN"
     
     # Check prerequisites

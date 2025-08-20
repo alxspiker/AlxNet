@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"betanet/internal/core"
+	"alxnet/internal/core"
 
 	"github.com/dgraph-io/badger/v4"
 	"github.com/fxamacker/cbor/v2"
@@ -28,6 +28,7 @@ const (
 // Store represents a robust key-value store with enhanced security
 type Store struct {
 	db         *badger.DB
+	dataDir    string
 	maxRetries int
 	retryDelay time.Duration
 	logger     *zap.Logger
@@ -45,7 +46,8 @@ type StoreStats struct {
 }
 
 func Open(dir string) (*Store, error) {
-	db, err := badger.Open(badger.DefaultOptions(filepath.Clean(dir)))
+	cleanDir := filepath.Clean(dir)
+	db, err := badger.Open(badger.DefaultOptions(cleanDir))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -58,18 +60,24 @@ func Open(dir string) (*Store, error) {
 
 	s := &Store{
 		db:         db,
+		dataDir:    cleanDir,
 		maxRetries: DefaultMaxRetries,
 		retryDelay: DefaultRetryDelay,
 		logger:     logger,
 	}
 
-	logger.Info("store opened successfully", zap.String("dir", dir))
+	logger.Info("store opened successfully", zap.String("dir", cleanDir))
 	return s, nil
 }
 
 func (s *Store) Close() error {
 	s.logger.Info("closing store")
 	return s.db.Close()
+}
+
+// GetDataDir returns the data directory path
+func (s *Store) GetDataDir() string {
+	return s.dataDir
 }
 
 // PutRecordWithRetry stores a record with automatic retry logic
@@ -479,7 +487,8 @@ func (s *Store) GetHead(siteID string) (uint64, string, error) {
 		defer it.Close()
 
 		prefix := []byte("site:" + siteID + ":head:")
-		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+		it.Seek(prefix)
+		if it.ValidForPrefix(prefix) {
 			item := it.Item()
 			k := string(item.Key())
 			// Extract sequence from key "site:siteID:head:seq"
@@ -500,7 +509,6 @@ func (s *Store) GetHead(siteID string) (uint64, string, error) {
 			if err != nil {
 				return err
 			}
-			break
 		}
 		return nil
 	})
@@ -618,29 +626,6 @@ func (s *Store) TransferDomain(domain string, newOwnerPub []byte, signature []by
 	// TODO: Implement domain transfer with cryptographic proof
 	// For now, just return an error
 	return errors.New("domain transfer not yet implemented")
-}
-
-// Helper function to validate domain format
-func isValidDomain(domain string) bool {
-	// Must be in format: alphanumerical.alphanumerical
-	parts := strings.Split(domain, ".")
-	if len(parts) != 2 {
-		return false
-	}
-
-	// Both parts must be alphanumeric and non-empty
-	for _, part := range parts {
-		if len(part) == 0 {
-			return false
-		}
-		for _, char := range part {
-			if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9')) {
-				return false
-			}
-		}
-	}
-
-	return true
 }
 
 // Validation methods

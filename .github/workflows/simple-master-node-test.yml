@@ -47,14 +47,14 @@ jobs:
         
         # Build the network binary
         go mod tidy
-        go build -o bin/betanet-network ./cmd/betanet-network
+        go build -o bin/alxnet-network ./cmd/alxnet-network
         
         # Test discovery command (simulates remote node discovery)
         echo "Simulating remote node discovering your network..."
         echo "This simulates a node from anywhere in the world discovering your network!"
         
         # Test with timeout and error handling
-        if timeout 30s ./bin/betanet-network -command discover; then
+        if timeout 30s ./bin/alxnet-network -command discover; then
           echo "✅ Discovery command executed successfully"
         else
           echo "⚠️  Discovery command completed (expected behavior in test environment)"
@@ -66,7 +66,7 @@ jobs:
       run: |
         echo "📊 Generating master node status report..."
         
-        echo "# 🌐 Betanet Master Node Status" > master-node-status.md
+        echo "# 🌐 AlxNet Master Node Status" > master-node-status.md
         echo "" >> master-node-status.md
         echo "**Repository:** ${{ github.repository }}" >> master-node-status.md
         echo "**Status:** 🟢 OPERATIONAL" >> master-node-status.md
@@ -88,7 +88,7 @@ jobs:
         echo "- **Global Access:** Verified" >> master-node-status.md
         echo "" >> master-node-status.md
         echo "### 🚀 Ready for Production" >> master-node-status.md
-        echo "Your Betanet master node is now:" >> master-node-status.md
+        echo "Your AlxNet master node is now:" >> master-node-status.md
         echo "- **Globally accessible** via GitHub" >> master-node-status.md
         echo "- **Cross-internet functional** for peer discovery" >> master-node-status.md
         echo "- **Production ready** with comprehensive testing" >> master-node-status.md
@@ -120,4 +120,4 @@ jobs:
         echo "✅ Network is ready for worldwide deployment"
         echo ""
         echo "🌍 Anyone can now discover your network from anywhere in the world!"
-        echo "🚀 Your Betanet project is production-ready!"
+        echo "🚀 Your AlxNet project is production-ready!"

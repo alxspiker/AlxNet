@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"betanet/internal/core"
-	bncrypto "betanet/internal/crypto"
-	"betanet/internal/store"
+	"alxnet/internal/core"
+	bncrypto "alxnet/internal/crypto"
+	"alxnet/internal/store"
 
 	"github.com/fxamacker/cbor/v2"
 	libp2p "github.com/libp2p/go-libp2p"
@@ -29,8 +29,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const Topic = "betanet/updates/v1"
-const BrowseProto protocol.ID = "/betanet/browse/1.0.0"
+const Topic = "alxnet/updates/v1"
+const BrowseProto protocol.ID = "/alxnet/browse/1.0.0"
 
 // Security and performance constants
 const (
@@ -57,7 +57,6 @@ type RateLimiter struct {
 	requests    map[string][]time.Time
 	maxRequests int
 	window      time.Duration
-	mu          sync.RWMutex
 }
 
 // PeerInfo tracks peer reputation and status
@@ -82,10 +81,10 @@ type Node struct {
 	BootstrapAddrs []ma.Multiaddr
 
 	// Security and performance features
-	rateLimiter    *RateLimiter
-	peers          map[peer.ID]*PeerInfo
-	bannedPeers    map[peer.ID]time.Time
-	memoryUsage    int64
+	rateLimiter *RateLimiter
+	peers       map[peer.ID]*PeerInfo
+	bannedPeers map[peer.ID]time.Time
+
 	maxMemoryUsage int64
 	mu             sync.RWMutex
 
@@ -235,7 +234,7 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 	}()
 	// Enable mDNS advertise/respond on LAN so Browser auto-discovery can find this node
-	_ = mdns.NewMdnsService(n.Host, "betanet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
+	_ = mdns.NewMdnsService(n.Host, "alxnet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
 		log.Printf("mDNS: discovered peer %s", pi.ID)
 	}})
 	// Attempt to connect to bootstrap peers, if any
@@ -472,7 +471,10 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	log.Printf("handleBrowseStream: new stream from %s", s.Conn().RemotePeer())
 
 	// Set read deadline to prevent hanging
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("handleBrowseStream: failed to set read deadline: %v", err)
+		return
+	}
 
 	dec, _ := cbor.DecOptions{}.DecMode()
 	reqBytes := readAllWithTimeout(s, 5*time.Second)
@@ -485,7 +487,10 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	log.Printf("handleBrowseStream: got request type=%s siteID=%s cid=%s", req.Type, req.SiteID, req.CID)
 
 	// Set write deadline
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("handleBrowseStream: failed to set write deadline: %v", err)
+		return
+	}
 
 	switch req.Type {
 	case "get_head":
@@ -517,21 +522,6 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	}
 }
 
-func readAll(r io.Reader) []byte {
-	buf := make([]byte, 0, 2048)
-	tmp := make([]byte, 2048)
-	for {
-		n, err := r.Read(tmp)
-		if n > 0 {
-			buf = append(buf, tmp[:n]...)
-		}
-		if err != nil {
-			break
-		}
-	}
-	return buf
-}
-
 func readAllWithTimeout(r io.Reader, timeout time.Duration) []byte {
 	// For network streams, try to read with a reasonable timeout
 	buf := make([]byte, 0, 2048)
@@ -559,7 +549,7 @@ func readAllWithTimeout(r io.Reader, timeout time.Duration) []byte {
 // DiscoverBestPeer finds the lowest RTT mDNS peer within the timeout.
 func (n *Node) DiscoverBestPeer(ctx context.Context, timeout time.Duration) (*peer.AddrInfo, error) {
 	found := make(chan peer.AddrInfo, 32)
-	_ = mdns.NewMdnsService(n.Host, "betanet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
+	_ = mdns.NewMdnsService(n.Host, "alxnet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
 		log.Printf("mDNS discovery: found peer %s with addrs %v", pi.ID, pi.Addrs)
 		select {
 		case found <- pi:
@@ -593,7 +583,7 @@ func (n *Node) DiscoverBestPeer(ctx context.Context, timeout time.Duration) (*pe
 	return best, nil
 }
 
-// DiscoverLocalhostPeer tries to find betanet nodes on common localhost ports
+// DiscoverLocalhostPeer tries to find alxnet nodes on common localhost ports
 func (n *Node) DiscoverLocalhostPeer(ctx context.Context) (*peer.AddrInfo, error) {
 	log.Printf("Trying localhost discovery on common ports...")
 
@@ -641,8 +631,14 @@ func (n *Node) RequestHead(ctx context.Context, p peer.AddrInfo, siteID string) 
 	defer s.Close()
 
 	// Set timeouts
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("RequestHead: failed to set write deadline: %v", err)
+		return 0, "", "", err
+	}
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("RequestHead: failed to set read deadline: %v", err)
+		return 0, "", "", err
+	}
 
 	log.Printf("RequestHead: sending request for site %s", siteID)
 	req := browseReq{Type: "get_head", SiteID: siteID}
@@ -654,7 +650,9 @@ func (n *Node) RequestHead(ctx context.Context, p peer.AddrInfo, siteID string) 
 
 	// Close write side to signal end of request
 	if closer, ok := s.(interface{ CloseWrite() error }); ok {
-		closer.CloseWrite()
+		if err := closer.CloseWrite(); err != nil {
+			log.Printf("RequestHead: failed to close write side: %v", err)
+		}
 	}
 
 	log.Printf("RequestHead: reading response")
@@ -689,8 +687,14 @@ func (n *Node) RequestContent(ctx context.Context, p peer.AddrInfo, cid string) 
 	defer s.Close()
 
 	// Set timeouts
-	s.SetWriteDeadline(time.Now().Add(5 * time.Second))
-	s.SetReadDeadline(time.Now().Add(10 * time.Second))
+	if err := s.SetWriteDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		log.Printf("RequestContent: failed to set write deadline: %v", err)
+		return nil, err
+	}
+	if err := s.SetReadDeadline(time.Now().Add(10 * time.Second)); err != nil {
+		log.Printf("RequestContent: failed to set read deadline: %v", err)
+		return nil, err
+	}
 
 	req := browseReq{Type: "get_content", CID: cid}
 	b, _ := cborMarshal(req)
@@ -700,7 +704,9 @@ func (n *Node) RequestContent(ctx context.Context, p peer.AddrInfo, cid string) 
 
 	// Close write side to signal end of request
 	if closer, ok := s.(interface{ CloseWrite() error }); ok {
-		closer.CloseWrite()
+		if err := closer.CloseWrite(); err != nil {
+			log.Printf("RequestContent: failed to close write side: %v", err)
+		}
 	}
 
 	dec, _ := cbor.DecOptions{}.DecMode()
@@ -764,36 +770,6 @@ func PubHex(pub ed25519.PublicKey) string {
 	return hex.EncodeToString(pub)
 }
 
-// Rate limiting methods
-func (n *Node) checkRateLimit(peerID string) bool {
-	if !n.config.EnableRateLimiting {
-		return true
-	}
-
-	n.rateLimiter.mu.Lock()
-	defer n.rateLimiter.mu.Unlock()
-
-	now := time.Now()
-	if requests, exists := n.rateLimiter.requests[peerID]; exists {
-		// Remove old requests outside window
-		var valid []time.Time
-		for _, req := range requests {
-			if now.Sub(req) < n.rateLimiter.window {
-				valid = append(valid, req)
-			}
-		}
-		n.rateLimiter.requests[peerID] = valid
-
-		if len(valid) >= n.rateLimiter.maxRequests {
-			n.logger.Warn("rate limit exceeded", zap.String("peer", peerID))
-			return false // Rate limit exceeded
-		}
-	}
-
-	n.rateLimiter.requests[peerID] = append(n.rateLimiter.requests[peerID], now)
-	return true
-}
-
 // Peer validation methods
 func (n *Node) validatePeer(peerID peer.ID) error {
 	if !n.config.EnablePeerValidation {
@@ -822,19 +798,6 @@ func (n *Node) validatePeer(peerID peer.ID) error {
 	return nil
 }
 
-func (n *Node) banPeer(peerID peer.ID, reason string, duration time.Duration) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	banUntil := time.Now().Add(duration)
-	n.bannedPeers[peerID] = banUntil
-
-	n.logger.Warn("peer banned",
-		zap.String("peer", peerID.String()),
-		zap.String("reason", reason),
-		zap.Time("until", banUntil))
-}
-
 func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -854,27 +817,6 @@ func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 			Reputation: delta,
 			LastSeen:   time.Now(),
 		}
-	}
-}
-
-// Memory management methods
-func (n *Node) checkMemoryLimit() error {
-	n.mu.RLock()
-	defer n.mu.RUnlock()
-
-	if n.memoryUsage > n.maxMemoryUsage {
-		return fmt.Errorf("memory usage limit exceeded: %d > %d", n.memoryUsage, n.maxMemoryUsage)
-	}
-	return nil
-}
-
-func (n *Node) updateMemoryUsage(delta int64) {
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.memoryUsage += delta
-	if n.memoryUsage < 0 {
-		n.memoryUsage = 0
 	}
 }
 
@@ -977,21 +919,4 @@ func (n *Node) handlePeerConnected(net network.Network, conn network.Conn) {
 func (n *Node) handlePeerDisconnected(net network.Network, conn network.Conn) {
 	peerID := conn.RemotePeer()
 	n.logger.Info("peer disconnected", zap.String("peer", peerID.String()))
-}
-
-// Enhanced logging methods
-func (n *Node) logError(msg string, err error, fields ...zap.Field) {
-	n.logger.Error(msg, append(fields, zap.Error(err))...)
-}
-
-func (n *Node) logInfo(msg string, fields ...zap.Field) {
-	n.logger.Info(msg, fields...)
-}
-
-func (n *Node) logDebug(msg string, fields ...zap.Field) {
-	n.logger.Debug(msg, fields...)
-}
-
-func (n *Node) logWarn(msg string, fields ...zap.Field) {
-	n.logger.Warn(msg, fields...)
 }
