@@ -57,7 +57,7 @@ type RateLimiter struct {
 	requests    map[string][]time.Time
 	maxRequests int
 	window      time.Duration
-	mu          sync.RWMutex //nolint:unused // For future use
+
 }
 
 // PeerInfo tracks peer reputation and status
@@ -85,7 +85,7 @@ type Node struct {
 	rateLimiter    *RateLimiter
 	peers          map[peer.ID]*PeerInfo
 	bannedPeers    map[peer.ID]time.Time
-	memoryUsage    int64 //nolint:unused // For future memory monitoring
+
 	maxMemoryUsage int64
 	mu             sync.RWMutex
 
@@ -523,20 +523,7 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	}
 }
 
-func readAll(r io.Reader) []byte { //nolint:unused // Utility function for future use
-	buf := make([]byte, 0, 2048)
-	tmp := make([]byte, 2048)
-	for {
-		n, err := r.Read(tmp)
-		if n > 0 {
-			buf = append(buf, tmp[:n]...)
-		}
-		if err != nil {
-			break
-		}
-	}
-	return buf
-}
+
 
 func readAllWithTimeout(r io.Reader, timeout time.Duration) []byte {
 	// For network streams, try to read with a reasonable timeout
@@ -786,35 +773,7 @@ func PubHex(pub ed25519.PublicKey) string {
 	return hex.EncodeToString(pub)
 }
 
-// Rate limiting methods
-func (n *Node) checkRateLimit(peerID string) bool { //nolint:unused // For future rate limiting
-	if !n.config.EnableRateLimiting {
-		return true
-	}
 
-	n.rateLimiter.mu.Lock()
-	defer n.rateLimiter.mu.Unlock()
-
-	now := time.Now()
-	if requests, exists := n.rateLimiter.requests[peerID]; exists {
-		// Remove old requests outside window
-		var valid []time.Time
-		for _, req := range requests {
-			if now.Sub(req) < n.rateLimiter.window {
-				valid = append(valid, req)
-			}
-		}
-		n.rateLimiter.requests[peerID] = valid
-
-		if len(valid) >= n.rateLimiter.maxRequests {
-			n.logger.Warn("rate limit exceeded", zap.String("peer", peerID))
-			return false // Rate limit exceeded
-		}
-	}
-
-	n.rateLimiter.requests[peerID] = append(n.rateLimiter.requests[peerID], now)
-	return true
-}
 
 // Peer validation methods
 func (n *Node) validatePeer(peerID peer.ID) error {
@@ -844,18 +803,7 @@ func (n *Node) validatePeer(peerID peer.ID) error {
 	return nil
 }
 
-func (n *Node) banPeer(peerID peer.ID, reason string, duration time.Duration) { //nolint:unused // For future peer management
-	n.mu.Lock()
-	defer n.mu.Unlock()
 
-	banUntil := time.Now().Add(duration)
-	n.bannedPeers[peerID] = banUntil
-
-	n.logger.Warn("peer banned",
-		zap.String("peer", peerID.String()),
-		zap.String("reason", reason),
-		zap.Time("until", banUntil))
-}
 
 func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 	n.mu.Lock()
@@ -879,26 +827,7 @@ func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 	}
 }
 
-// Memory management methods
-func (n *Node) checkMemoryLimit() error { //nolint:unused // For future memory management
-	n.mu.RLock()
-	defer n.mu.RUnlock()
 
-	if n.memoryUsage > n.maxMemoryUsage {
-		return fmt.Errorf("memory usage limit exceeded: %d > %d", n.memoryUsage, n.maxMemoryUsage)
-	}
-	return nil
-}
-
-func (n *Node) updateMemoryUsage(delta int64) { //nolint:unused // For future memory tracking
-	n.mu.Lock()
-	defer n.mu.Unlock()
-
-	n.memoryUsage += delta
-	if n.memoryUsage < 0 {
-		n.memoryUsage = 0
-	}
-}
 
 func (n *Node) cleanupOldContent() {
 	// Implement LRU cleanup for old content
@@ -1001,19 +930,4 @@ func (n *Node) handlePeerDisconnected(net network.Network, conn network.Conn) {
 	n.logger.Info("peer disconnected", zap.String("peer", peerID.String()))
 }
 
-// Enhanced logging methods
-func (n *Node) logError(msg string, err error, fields ...zap.Field) { //nolint:unused // For future enhanced logging
-	n.logger.Error(msg, append(fields, zap.Error(err))...)
-}
 
-func (n *Node) logInfo(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
-	n.logger.Info(msg, fields...)
-}
-
-func (n *Node) logDebug(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
-	n.logger.Debug(msg, fields...)
-}
-
-func (n *Node) logWarn(msg string, fields ...zap.Field) { //nolint:unused // For future enhanced logging
-	n.logger.Warn(msg, fields...)
-}

@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"betanet/internal/core"
@@ -157,7 +156,7 @@ type WalletManager struct {
 	config      *SecurityConfig
 	logger      *zap.Logger
 	rateLimiter map[string][]time.Time
-	mu          sync.RWMutex //nolint:unused // For future thread-safe operations
+
 }
 
 // NewWalletManager creates a new wallet manager with security features
@@ -226,36 +225,7 @@ func ValidatePassphrase(passphrase string, requireStrong bool) error {
 	return nil
 }
 
-// Rate limiting methods
-func (wm *WalletManager) checkRateLimit(identifier string) error { //nolint:unused // For future rate limiting
-	if !wm.config.EnableRateLimiting {
-		return nil
-	}
 
-	wm.mu.Lock()
-	defer wm.mu.Unlock()
-
-	now := time.Now()
-	window := time.Minute
-
-	if requests, exists := wm.rateLimiter[identifier]; exists {
-		// Remove old requests outside window
-		var valid []time.Time
-		for _, req := range requests {
-			if now.Sub(req) < window {
-				valid = append(valid, req)
-			}
-		}
-		wm.rateLimiter[identifier] = valid
-
-		if len(valid) >= wm.config.MaxAttemptsPerMinute {
-			return fmt.Errorf("rate limit exceeded: %d attempts per minute", wm.config.MaxAttemptsPerMinute)
-		}
-	}
-
-	wm.rateLimiter[identifier] = append(wm.rateLimiter[identifier], now)
-	return nil
-}
 
 func NewMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(256)

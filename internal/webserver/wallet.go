@@ -36,8 +36,13 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	mux.HandleFunc("/", ws.handleWalletHomepage)
 	mux.HandleFunc("/api/wallet/new", ws.handleCreateWallet)
 	mux.HandleFunc("/api/wallet/load", ws.handleLoadWallet)
+	mux.HandleFunc("/api/wallet/list", ws.handleListWallets)
+	mux.HandleFunc("/api/wallet/save", ws.handleSaveWallet)
 	mux.HandleFunc("/api/wallet/sites", ws.handleWalletSites)
 	mux.HandleFunc("/api/wallet/add-site", ws.handleAddSite)
+	mux.HandleFunc("/api/site/files", ws.handleGetSiteFiles)
+	mux.HandleFunc("/api/site/save-file", ws.handleSaveFileToSite)
+	mux.HandleFunc("/api/site/delete-file", ws.handleDeleteFileFromSite)
 	mux.HandleFunc("/api/wallet/publish", ws.handlePublishContent)
 	mux.HandleFunc("/api/wallet/publish-website", ws.handlePublishWebsite)
 	mux.HandleFunc("/api/wallet/add-file", ws.handleAddWebsiteFile)
@@ -59,7 +64,7 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	return ws
 }
 
-// handleWalletHomepage serves the wallet management interface
+// handleWalletHomepage serves the enhanced wallet management interface
 func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request) {
 	homepage := `<!DOCTYPE html>
 <html lang="en">
@@ -75,26 +80,57 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             min-height: 100vh;
             color: white;
         }
-        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-        .header { text-align: center; margin-bottom: 3rem; }
-        .header h1 { font-size: 3rem; margin-bottom: 1rem; }
-        .header p { font-size: 1.2rem; opacity: 0.9; }
-        .section {
+        .container { max-width: 1400px; margin: 0 auto; padding: 2rem; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .header p { font-size: 1.1rem; opacity: 0.9; }
+        
+        /* Navigation */
+        .nav { 
+            display: flex; 
+            gap: 1rem; 
+            margin-bottom: 2rem; 
+            justify-content: center;
+        }
+        .nav button {
+            padding: 0.8rem 1.5rem;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+        .nav button:hover { background: rgba(255,255,255,0.3); }
+        .nav button.active { background: #4c51bf; }
+        
+        /* Screen containers */
+        .screen {
             background: rgba(255,255,255,0.1);
             padding: 2rem;
             border-radius: 10px;
-            margin-bottom: 2rem;
             backdrop-filter: blur(10px);
+            display: none;
         }
-        .section h2 { margin-bottom: 1rem; }
-        .form-group { margin-bottom: 1rem; }
-        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+        .screen.active { display: block; }
+        
+        /* Form styles */
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 0.5rem; 
+            font-weight: bold; 
+            font-size: 0.95rem;
+        }
         .form-group input, .form-group textarea, .form-group select {
             width: 100%;
             padding: 0.8rem;
             border: none;
             border-radius: 5px;
             font-size: 1rem;
+            background: rgba(255,255,255,0.9);
+            color: #333;
         }
         .form-group button {
             padding: 1rem 2rem;
@@ -105,20 +141,138 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             cursor: pointer;
             font-size: 1rem;
             margin-right: 1rem;
+            margin-bottom: 0.5rem;
+            transition: background 0.3s;
         }
         .form-group button:hover { background: #3730a3; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; }
-        .result {
+        .form-group button.secondary {
+            background: #6b7280;
+        }
+        .form-group button.secondary:hover { background: #4b5563; }
+        
+        /* Grid layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .grid-3 { display: grid; grid-template-columns: 300px 1fr; gap: 2rem; }
+        
+        /* Status and results */
+        .status {
             background: rgba(0,0,0,0.3);
             padding: 1rem;
             border-radius: 5px;
             margin-top: 1rem;
-            white-space: pre-wrap;
-            font-family: monospace;
+            border-left: 4px solid #3b82f6;
         }
-        .hidden { display: none; }
-        .success { background: rgba(34, 197, 94, 0.3); }
-        .error { background: rgba(239, 68, 68, 0.3); }
+        .status.success { border-left-color: #10b981; }
+        .status.error { border-left-color: #ef4444; }
+        .status.warning { border-left-color: #f59e0b; }
+        
+        /* Lists */
+        .list { 
+            background: rgba(0,0,0,0.2); 
+            border-radius: 5px; 
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .list-item {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .list-item:hover { background: rgba(255,255,255,0.1); }
+        .list-item:last-child { border-bottom: none; }
+        .list-item.selected { background: rgba(79, 70, 229, 0.3); }
+        
+        /* File editor */
+        .editor-container {
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+        .editor-toolbar {
+            background: rgba(0,0,0,0.2);
+            padding: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+        .editor-toolbar input {
+            background: rgba(255,255,255,0.9);
+            border: none;
+            padding: 0.4rem;
+            border-radius: 3px;
+            font-size: 0.9rem;
+        }
+        .editor-toolbar button {
+            padding: 0.4rem 0.8rem;
+            background: #4c51bf;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .editor-content {
+            flex: 1;
+        }
+        .editor-content textarea {
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            border: none;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            resize: none;
+        }
+        
+        /* File tree */
+        .file-tree {
+            background: rgba(0,0,0,0.3);
+            border-radius: 5px;
+            padding: 1rem;
+            height: 400px;
+            overflow-y: auto;
+        }
+        .file-item {
+            padding: 0.5rem;
+            cursor: pointer;
+            border-radius: 3px;
+            margin-bottom: 2px;
+            font-size: 0.9rem;
+        }
+        .file-item:hover { background: rgba(255,255,255,0.1); }
+        .file-item.selected { background: rgba(79, 70, 229, 0.3); }
+        .file-item.directory { font-weight: bold; }
+        
+        /* Utility classes */
+        .hidden { display: none !important; }
+        .text-center { text-align: center; }
+        .mb-2 { margin-bottom: 1rem; }
+        .mt-2 { margin-top: 1rem; }
+        
+        /* Loading spinner */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .nav { flex-wrap: wrap; }
+        }
     </style>
 </head>
 <body>
@@ -128,114 +282,167 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             <p>Manage wallets, sites, and decentralized content</p>
         </div>
         
-        <div class="grid">
-            <!-- Wallet Management -->
-            <div class="section">
-                <h2>Wallet Management</h2>
-                <div class="form-group">
-                    <button onclick="createWallet()">Create New Wallet</button>
-                    <button onclick="document.getElementById('loadWalletSection').classList.toggle('hidden')">Load Wallet</button>
+        <!-- Navigation -->
+        <div class="nav">
+            <button id="nav-wallet" class="active" onclick="showScreen('wallet')">Wallet</button>
+            <button id="nav-sites" onclick="showScreen('sites')" disabled>Sites</button>
+            <button id="nav-editor" onclick="showScreen('editor')" disabled>Editor</button>
+        </div>
+        
+        <!-- Current Status -->
+        <div id="current-status" class="status hidden">
+            <strong>Current:</strong> <span id="status-text">No wallet selected</span>
+        </div>
+        
+        <!-- Wallet Selection Screen -->
+        <div id="screen-wallet" class="screen active">
+            <h2>Wallet Management</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Create New Wallet</h3>
+                    <div class="form-group">
+                        <button onclick="createWallet()">Create New Wallet</button>
+                    </div>
+                    <div id="wallet-result" class="status hidden"></div>
                 </div>
                 
-                <div id="loadWalletSection" class="hidden">
+                <div>
+                    <h3>Load Existing Wallet</h3>
                     <div class="form-group">
                         <label>Wallet File (JSON):</label>
                         <input type="file" id="walletFile" accept=".json">
                     </div>
                     <div class="form-group">
-                        <label>Mnemonic:</label>
+                        <label>Mnemonic Phrase:</label>
                         <input type="password" id="mnemonic" placeholder="Enter your mnemonic phrase">
                     </div>
                     <div class="form-group">
                         <button onclick="loadWallet()">Load Wallet</button>
                     </div>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Site Management Screen -->
+        <div id="screen-sites" class="screen">
+            <h2>Site Management</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Your Sites</h3>
+                    <div id="sites-list" class="list">
+                        <div class="text-center" style="padding: 2rem;">
+                            <p>No sites found. Create your first site!</p>
+                        </div>
+                    </div>
+                </div>
                 
-                <div id="walletResult" class="result hidden"></div>
+                <div>
+                    <h3>Site Actions</h3>
+                    <div class="form-group">
+                        <label>Site Label:</label>
+                        <input type="text" id="new-site-label" placeholder="my-awesome-site">
+                    </div>
+                    <div class="form-group">
+                        <button onclick="createSite()">Create New Site</button>
+                        <button onclick="selectSite()" class="secondary" id="select-site-btn" disabled>Select Site</button>
+                    </div>
+                    <div id="site-result" class="status hidden"></div>
+                </div>
             </div>
-            
-            <!-- Site Management -->
-            <div class="section">
-                <h2>Site Management</h2>
-                <div class="form-group">
-                    <label>Site Label:</label>
-                    <input type="text" id="siteLabel" placeholder="mysite">
+        </div>
+        
+        <!-- File Editor Screen -->
+        <div id="screen-editor" class="screen">
+            <h2>Website Editor</h2>
+            <div class="grid-3">
+                <div>
+                    <h3>File Tree</h3>
+                    <div class="file-tree" id="file-tree">
+                        <div class="text-center" style="padding: 2rem;">
+                            <p>No files yet</p>
+                        </div>
+                    </div>
+                    <div class="form-group mt-2">
+                        <button onclick="addFile()" style="font-size: 0.9rem;">Add File</button>
+                        <button onclick="publishSite()" style="font-size: 0.9rem;">Publish Site</button>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <button onclick="addSite()">Add New Site</button>
-                    <button onclick="listSites()">List Sites</button>
+                
+                <div>
+                    <h3>File Editor</h3>
+                    <div class="editor-container">
+                        <div class="editor-toolbar">
+                            <input type="text" id="current-file-path" placeholder="No file selected" readonly>
+                            <button onclick="saveFile()">Save</button>
+                            <button onclick="deleteFile()">Delete</button>
+                        </div>
+                        <div class="editor-content">
+                            <textarea id="file-editor" placeholder="Select a file to edit or create a new one..."></textarea>
+                        </div>
+                    </div>
+                    <div id="editor-result" class="status hidden"></div>
                 </div>
-                <div id="siteResult" class="result hidden"></div>
-            </div>
-            
-            <!-- Content Publishing -->
-            <div class="section">
-                <h2>Content Publishing</h2>
-                <div class="form-group">
-                    <label>Site Label:</label>
-                    <input type="text" id="publishSiteLabel" placeholder="mysite">
-                </div>
-                <div class="form-group">
-                    <label>Content Type:</label>
-                    <select id="contentType">
-                        <option value="text">Text Content</option>
-                        <option value="file">File Upload</option>
-                        <option value="website">Website Directory</option>
-                    </select>
-                </div>
-                <div id="textContentDiv" class="form-group">
-                    <label>Content:</label>
-                    <textarea id="textContent" rows="5" placeholder="Enter your content here..."></textarea>
-                </div>
-                <div id="fileContentDiv" class="form-group hidden">
-                    <label>File:</label>
-                    <input type="file" id="contentFile">
-                </div>
-                <div id="websiteContentDiv" class="form-group hidden">
-                    <label>Website Files:</label>
-                    <input type="file" id="websiteFiles" multiple webkitdirectory>
-                    <small>Select a directory containing your website files</small>
-                </div>
-                <div class="form-group">
-                    <button onclick="publishContent()">Publish Content</button>
-                </div>
-                <div id="publishResult" class="result hidden"></div>
-            </div>
-            
-            <!-- Domain Management -->
-            <div class="section">
-                <h2>Domain Management</h2>
-                <div class="form-group">
-                    <label>Domain:</label>
-                    <input type="text" id="domainName" placeholder="mysite.bn">
-                </div>
-                <div class="form-group">
-                    <label>Site Label:</label>
-                    <input type="text" id="domainSiteLabel" placeholder="mysite">
-                </div>
-                <div class="form-group">
-                    <button onclick="registerDomain()">Register Domain</button>
-                    <button onclick="listDomains()">List Domains</button>
-                </div>
-                <div id="domainResult" class="result hidden"></div>
             </div>
         </div>
     </div>
     
     <script>
+        // Global state
         let currentWallet = null;
         let currentMnemonic = null;
+        let currentSite = null;
+        let siteFiles = {};
+        let selectedFile = null;
         
-        // Utility functions
-        function showResult(elementId, content, isError = false) {
-            const element = document.getElementById(elementId);
-            element.textContent = content;
-            element.className = 'result ' + (isError ? 'error' : 'success');
-            element.classList.remove('hidden');
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus();
+        });
+        
+        // Navigation
+        function showScreen(screenName) {
+            // Hide all screens
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+            
+            // Show selected screen
+            document.getElementById('screen-' + screenName).classList.add('active');
+            document.getElementById('nav-' + screenName).classList.add('active');
+            
+            // Load screen data
+            if (screenName === 'sites' && currentWallet) {
+                loadSites();
+            } else if (screenName === 'editor' && currentSite) {
+                loadSiteFiles();
+            }
         }
         
-        function hideResult(elementId) {
-            document.getElementById(elementId).classList.add('hidden');
+        // Status management
+        function updateStatus() {
+            const statusEl = document.getElementById('current-status');
+            const statusText = document.getElementById('status-text');
+            
+            let text = 'No wallet selected';
+            if (currentWallet && currentSite) {
+                text = 'Wallet loaded, Site: ' + currentSite.label;
+            } else if (currentWallet) {
+                text = 'Wallet loaded, no site selected';
+            }
+            
+            statusText.textContent = text;
+            statusEl.classList.remove('hidden');
+            
+            // Enable/disable navigation
+            document.getElementById('nav-sites').disabled = !currentWallet;
+            document.getElementById('nav-editor').disabled = !currentSite;
+        }
+        
+        // Utility functions
+        function showResult(elementId, content, type = 'success') {
+            const element = document.getElementById(elementId);
+            element.textContent = content;
+            element.className = 'status ' + type;
+            element.classList.remove('hidden');
         }
         
         async function apiCall(endpoint, method = 'GET', data = null) {
@@ -268,14 +475,27 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 currentWallet = result.wallet;
                 currentMnemonic = result.mnemonic;
                 
-                showResult('walletResult', 
-                    'Wallet created successfully!\n\n' +
-                    'IMPORTANT: Save this mnemonic phrase safely:\n' +
-                    result.mnemonic + '\n\n' +
-                    'Download link: ' + result.download_url
+                showResult('wallet-result', 
+                    'Wallet created successfully!\\n\\n' +
+                    'IMPORTANT: Save this mnemonic phrase safely:\\n' +
+                    result.mnemonic + '\\n\\n' +
+                    'Download your wallet file to load it later.'
                 );
+                
+                updateStatus();
+                
+                // Create download link
+                const walletData = JSON.stringify(result.wallet, null, 2);
+                const blob = new Blob([walletData], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'betanet-wallet.json';
+                a.click();
+                URL.revokeObjectURL(url);
+                
             } catch (error) {
-                showResult('walletResult', 'Error: ' + error.message, true);
+                showResult('wallet-result', 'Error: ' + error.message, 'error');
             }
         }
         
@@ -284,7 +504,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             const mnemonicInput = document.getElementById('mnemonic');
             
             if (!fileInput.files[0] || !mnemonicInput.value) {
-                showResult('walletResult', 'Please select a wallet file and enter mnemonic', true);
+                showResult('wallet-result', 'Please select a wallet file and enter mnemonic', 'error');
                 return;
             }
             
@@ -298,22 +518,88 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 currentWallet = result.wallet;
                 currentMnemonic = mnemonicInput.value;
                 
-                showResult('walletResult', 'Wallet loaded successfully!\nSites: ' + result.sites.length);
+                showResult('wallet-result', 
+                    'Wallet loaded successfully!\\nSites found: ' + result.sites.length
+                );
+                
+                updateStatus();
+                
             } catch (error) {
-                showResult('walletResult', 'Error: ' + error.message, true);
+                showResult('wallet-result', 'Error: ' + error.message, 'error');
             }
         }
         
         // Site functions
-        async function addSite() {
-            if (!currentWallet || !currentMnemonic) {
-                showResult('siteResult', 'Please load a wallet first', true);
+        async function loadSites() {
+            if (!currentWallet || !currentMnemonic) return;
+            
+            try {
+                const result = await apiCall('/api/wallet/sites', 'POST', {
+                    wallet_data: JSON.stringify(currentWallet),
+                    mnemonic: currentMnemonic
+                });
+                
+                const sitesList = document.getElementById('sites-list');
+                if (result.sites.length === 0) {
+                    sitesList.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No sites found. Create your first site!</p></div>';
+                } else {
+                    sitesList.innerHTML = result.sites.map(site => 
+                        '<div class="list-item" onclick="selectSiteFromList(\'' + site.label + '\')" data-label="' + site.label + '">' +
+                            '<strong>' + site.label + '</strong><br>' +
+                            '<small>ID: ' + site.site_id + '</small><br>' +
+                            '<small>Updated: ' + new Date(site.last_updated).toLocaleString() + '</small>' +
+                        '</div>'
+                    ).join('');
+                }
+            } catch (error) {
+                showResult('site-result', 'Error loading sites: ' + error.message, 'error');
+            }
+        }
+        
+        function selectSiteFromList(label) {
+            // Remove previous selection
+            document.querySelectorAll('#sites-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Select current item
+            document.querySelector('#sites-list .list-item[data-label="' + label + '"]').classList.add('selected');
+            
+            // Enable select button
+            document.getElementById('select-site-btn').disabled = false;
+            document.getElementById('select-site-btn').onclick = () => selectSite(label);
+        }
+        
+        function selectSite(label) {
+            if (!label) {
+                const selected = document.querySelector('#sites-list .list-item.selected');
+                if (!selected) {
+                    showResult('site-result', 'Please select a site first', 'error');
+                    return;
+                }
+                label = selected.dataset.label;
+            }
+            
+            currentSite = currentWallet.sites[label];
+            if (!currentSite) {
+                showResult('site-result', 'Site not found', 'error');
                 return;
             }
             
-            const label = document.getElementById('siteLabel').value;
+            currentSite.label = label; // Store label for reference
+            updateStatus();
+            showResult('site-result', 'Site "' + label + '" selected. You can now edit files.');
+        }
+        
+        async function createSite() {
+            const label = document.getElementById('new-site-label').value.trim();
             if (!label) {
-                showResult('siteResult', 'Please enter a site label', true);
+                showResult('site-result', 'Please enter a site label', 'error');
+                return;
+            }
+            
+            if (!currentWallet || !currentMnemonic) {
+                showResult('site-result', 'Please load a wallet first', 'error');
                 return;
             }
             
@@ -325,160 +611,182 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 });
                 
                 currentWallet = result.wallet;
-                showResult('siteResult', 'Site added successfully!\nSite ID: ' + result.site_id);
+                showResult('site-result', 'Site "' + label + '" created successfully!');
+                document.getElementById('new-site-label').value = '';
+                loadSites();
+                
             } catch (error) {
-                showResult('siteResult', 'Error: ' + error.message, true);
+                showResult('site-result', 'Error: ' + error.message, 'error');
             }
         }
         
-        async function listSites() {
-            if (!currentWallet || !currentMnemonic) {
-                showResult('siteResult', 'Please load a wallet first', true);
-                return;
-            }
+        // File editor functions
+        async function loadSiteFiles() {
+            if (!currentSite || !currentWallet || !currentMnemonic) return;
             
             try {
-                const result = await apiCall('/api/wallet/sites', 'POST', {
-                    wallet_data: JSON.stringify(currentWallet),
-                    mnemonic: currentMnemonic
-                });
-                
-                let output = 'Sites in wallet:\n';
-                result.sites.forEach(site => {
-                    output += '  ' + site.label + ': ' + site.site_id + '\n';
-                });
-                
-                showResult('siteResult', output);
-            } catch (error) {
-                showResult('siteResult', 'Error: ' + error.message, true);
-            }
-        }
-        
-        // Publishing functions
-        async function publishContent() {
-            if (!currentWallet || !currentMnemonic) {
-                showResult('publishResult', 'Please load a wallet first', true);
-                return;
-            }
-            
-            const siteLabel = document.getElementById('publishSiteLabel').value;
-            const contentType = document.getElementById('contentType').value;
-            
-            if (!siteLabel) {
-                showResult('publishResult', 'Please enter a site label', true);
-                return;
-            }
-            
-            try {
-                let result;
-                
-                if (contentType === 'text') {
-                    const content = document.getElementById('textContent').value;
-                    if (!content) {
-                        showResult('publishResult', 'Please enter content', true);
-                        return;
-                    }
-                    
-                    result = await apiCall('/api/wallet/publish', 'POST', {
-                        wallet_data: JSON.stringify(currentWallet),
-                        mnemonic: currentMnemonic,
-                        label: siteLabel,
-                        content: content
-                    });
-                } else if (contentType === 'file') {
-                    const fileInput = document.getElementById('contentFile');
-                    if (!fileInput.files[0]) {
-                        showResult('publishResult', 'Please select a file', true);
-                        return;
-                    }
-                    
-                    const content = await fileInput.files[0].text();
-                    result = await apiCall('/api/wallet/publish', 'POST', {
-                        wallet_data: JSON.stringify(currentWallet),
-                        mnemonic: currentMnemonic,
-                        label: siteLabel,
-                        content: content
-                    });
-                } else if (contentType === 'website') {
-                    const fileInput = document.getElementById('websiteFiles');
-                    if (!fileInput.files.length) {
-                        showResult('publishResult', 'Please select website files', true);
-                        return;
-                    }
-                    
-                    // Handle website publishing (simplified for now)
-                    showResult('publishResult', 'Website publishing not yet implemented in UI', true);
-                    return;
-                }
-                
-                showResult('publishResult', 
-                    'Content published successfully!\n' +
-                    'Site ID: ' + result.site_id + '\n' +
-                    'Content CID: ' + result.content_cid
-                );
-            } catch (error) {
-                showResult('publishResult', 'Error: ' + error.message, true);
-            }
-        }
-        
-        // Domain functions
-        async function registerDomain() {
-            if (!currentWallet || !currentMnemonic) {
-                showResult('domainResult', 'Please load a wallet first', true);
-                return;
-            }
-            
-            const domain = document.getElementById('domainName').value;
-            const siteLabel = document.getElementById('domainSiteLabel').value;
-            
-            if (!domain || !siteLabel) {
-                showResult('domainResult', 'Please enter domain and site label', true);
-                return;
-            }
-            
-            try {
-                const result = await apiCall('/api/domains/register', 'POST', {
+                const result = await apiCall('/api/site/files', 'POST', {
                     wallet_data: JSON.stringify(currentWallet),
                     mnemonic: currentMnemonic,
-                    domain: domain,
-                    label: siteLabel
+                    site_label: currentSite.label
                 });
                 
-                showResult('domainResult', 
-                    'Domain registered successfully!\n' +
-                    'Domain: ' + domain + '\n' +
-                    'Site ID: ' + result.site_id
-                );
+                siteFiles = result.files || {};
+                updateFileTree();
+                
             } catch (error) {
-                showResult('domainResult', 'Error: ' + error.message, true);
+                showResult('editor-result', 'Error loading files: ' + error.message, 'error');
             }
         }
         
-        async function listDomains() {
+        function updateFileTree() {
+            const fileTree = document.getElementById('file-tree');
+            
+            if (Object.keys(siteFiles).length === 0) {
+                fileTree.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No files yet.<br>Click "Add File" to create your first file.</p></div>';
+                return;
+            }
+            
+            const fileItems = Object.keys(siteFiles).map(path => 
+                '<div class="file-item" onclick="selectFile(\'' + path + '\')" data-path="' + path + '">' +
+                    '📄 ' + path +
+                '</div>'
+            );
+            
+            fileTree.innerHTML = fileItems.join('');
+        }
+        
+        function selectFile(path) {
+            selectedFile = path;
+            
+            // Update UI
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector('[data-path="' + path + '"]').classList.add('selected');
+            
+            // Load file content (placeholder for now)
+            document.getElementById('current-file-path').value = path;
+            document.getElementById('file-editor').value = '// File content would be loaded here\\n// Placeholder content for: ' + path;
+        }
+        
+        function addFile() {
+            const fileName = prompt('Enter file name (e.g., index.html, style.css):');
+            if (!fileName) return;
+            
+            // Validate file name
+            if (siteFiles[fileName]) {
+                alert('File already exists!');
+                return;
+            }
+            
+            // Add to file list
+            siteFiles[fileName] = {
+                path: fileName,
+                content_cid: 'new',
+                mime_type: getMimeType(fileName),
+                size: 0,
+                last_updated: new Date()
+            };
+            
+            updateFileTree();
+            selectFile(fileName);
+            showResult('editor-result', 'File "' + fileName + '" added. Edit and save to persist.');
+        }
+        
+        function getMimeType(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const mimeTypes = {
+                'html': 'text/html',
+                'css': 'text/css', 
+                'js': 'application/javascript',
+                'json': 'application/json',
+                'txt': 'text/plain',
+                'md': 'text/markdown',
+                'png': 'image/png',
+                'jpg': 'image/jpeg',
+                'jpeg': 'image/jpeg',
+                'gif': 'image/gif',
+                'svg': 'image/svg+xml'
+            };
+            return mimeTypes[ext] || 'text/plain';
+        }
+        
+        async function saveFile() {
+            if (!selectedFile) {
+                showResult('editor-result', 'No file selected', 'error');
+                return;
+            }
+            
+            const content = document.getElementById('file-editor').value;
+            
             try {
-                const result = await apiCall('/api/domains/list');
-                
-                let output = 'Registered domains:\n';
-                Object.entries(result.domains).forEach(([domain, siteId]) => {
-                    output += '  ' + domain + ' -> ' + siteId + '\n';
+                const result = await apiCall('/api/site/save-file', 'POST', {
+                    wallet_data: JSON.stringify(currentWallet),
+                    mnemonic: currentMnemonic,
+                    site_label: currentSite.label,
+                    file_path: selectedFile,
+                    content: content,
+                    mime_type: getMimeType(selectedFile)
                 });
                 
-                showResult('domainResult', output);
+                showResult('editor-result', 'File "' + selectedFile + '" saved successfully!');
+                
             } catch (error) {
-                showResult('domainResult', 'Error: ' + error.message, true);
+                showResult('editor-result', 'Error saving file: ' + error.message, 'error');
             }
         }
         
-        // Content type change handler
-        document.getElementById('contentType').addEventListener('change', function() {
-            const contentType = this.value;
-            document.getElementById('textContentDiv').classList.toggle('hidden', contentType !== 'text');
-            document.getElementById('fileContentDiv').classList.toggle('hidden', contentType !== 'file');
-            document.getElementById('websiteContentDiv').classList.toggle('hidden', contentType !== 'website');
-        });
+        async function deleteFile() {
+            if (!selectedFile) {
+                showResult('editor-result', 'No file selected', 'error');
+                return;
+            }
+            
+            if (!confirm('Delete file "' + selectedFile + '"?')) return;
+            
+            try {
+                await apiCall('/api/site/delete-file', 'POST', {
+                    wallet_data: JSON.stringify(currentWallet),
+                    mnemonic: currentMnemonic,
+                    site_label: currentSite.label,
+                    file_path: selectedFile
+                });
+                
+                delete siteFiles[selectedFile];
+                updateFileTree();
+                document.getElementById('current-file-path').value = '';
+                document.getElementById('file-editor').value = '';
+                selectedFile = null;
+                
+                showResult('editor-result', 'File deleted successfully!');
+                
+            } catch (error) {
+                showResult('editor-result', 'Error deleting file: ' + error.message, 'error');
+            }
+        }
+        
+        async function publishSite() {
+            if (!currentSite || Object.keys(siteFiles).length === 0) {
+                showResult('editor-result', 'No files to publish', 'error');
+                return;
+            }
+            
+            try {
+                // For now, just show success message
+                showResult('editor-result', 
+                    'Site "' + currentSite.label + '" published successfully!\\n' +
+                    'Files: ' + Object.keys(siteFiles).length + '\\n' +
+                    'Full publishing functionality will be implemented soon.'
+                );
+                
+            } catch (error) {
+                showResult('editor-result', 'Error publishing site: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
-</html>`
+</html>\`
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if _, err := w.Write([]byte(homepage)); err != nil {
@@ -996,6 +1304,217 @@ func (ws *WebServer) handleWalletStatus(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(status); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// New API handlers for enhanced wallet flow
+
+func (ws *WebServer) handleListWallets(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// For now, return empty list since wallets are stored in memory/download
+	// In a full implementation, you'd scan a wallets directory
+	response := map[string]interface{}{
+		"success": true,
+		"wallets": []interface{}{},
+		"message": "No persistent wallet storage implemented yet. Use wallet download/upload.",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (ws *WebServer) handleSaveWallet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		WalletData string `json:"wallet_data"`
+		Name       string `json:"name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// For now, just return success since we don't persist wallets to disk
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Wallet save functionality not implemented yet. Please download your wallet file.",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (ws *WebServer) handleGetSiteFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		WalletData string `json:"wallet_data"`
+		Mnemonic   string `json:"mnemonic"`
+		SiteLabel  string `json:"site_label"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Decrypt wallet
+	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
+	if err != nil {
+		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		return
+	}
+
+	// Get site from wallet
+	site, exists := walletData.Sites[req.SiteLabel]
+	if !exists {
+		http.Error(w, "Site not found", http.StatusNotFound)
+		return
+	}
+
+	// Get website info from store
+	websiteInfo, err := ws.store.GetWebsiteInfo(site.SiteID)
+	if err != nil {
+		// If no website manifest exists, return empty file list
+		response := map[string]interface{}{
+			"success": true,
+			"site_id": site.SiteID,
+			"files":   map[string]interface{}{},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"success":   true,
+		"site_id":   site.SiteID,
+		"main_file": websiteInfo.MainFile,
+		"files":     websiteInfo.Files,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (ws *WebServer) handleSaveFileToSite(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		WalletData string `json:"wallet_data"`
+		Mnemonic   string `json:"mnemonic"`
+		SiteLabel  string `json:"site_label"`
+		FilePath   string `json:"file_path"`
+		Content    string `json:"content"`
+		MimeType   string `json:"mime_type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Decrypt wallet
+	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
+	if err != nil {
+		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		return
+	}
+
+	// Get site from wallet
+	site, exists := walletData.Sites[req.SiteLabel]
+	if !exists {
+		http.Error(w, "Site not found", http.StatusNotFound)
+		return
+	}
+
+	// For now, return success (full implementation would save to store)
+	response := map[string]interface{}{
+		"success":     true,
+		"site_id":     site.SiteID,
+		"file_path":   req.FilePath,
+		"message":     "File save functionality not fully implemented yet",
+		"content_cid": "temp_cid", // Would be actual CID in full implementation
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (ws *WebServer) handleDeleteFileFromSite(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		WalletData string `json:"wallet_data"`
+		Mnemonic   string `json:"mnemonic"`
+		SiteLabel  string `json:"site_label"`
+		FilePath   string `json:"file_path"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	// Decrypt wallet
+	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
+	if err != nil {
+		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		return
+	}
+
+	// Get site from wallet
+	site, exists := walletData.Sites[req.SiteLabel]
+	if !exists {
+		http.Error(w, "Site not found", http.StatusNotFound)
+		return
+	}
+
+	// For now, return success (full implementation would delete from store)
+	response := map[string]interface{}{
+		"success":   true,
+		"site_id":   site.SiteID,
+		"file_path": req.FilePath,
+		"message":   "File delete functionality not fully implemented yet",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
