@@ -156,7 +156,6 @@ type WalletManager struct {
 	config      *SecurityConfig
 	logger      *zap.Logger
 	rateLimiter map[string][]time.Time
-
 }
 
 // NewWalletManager creates a new wallet manager with security features
@@ -224,8 +223,6 @@ func ValidatePassphrase(passphrase string, requireStrong bool) error {
 
 	return nil
 }
-
-
 
 func NewMnemonic() (string, error) {
 	entropy, err := bip39.NewEntropy(256)

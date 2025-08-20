@@ -57,7 +57,6 @@ type RateLimiter struct {
 	requests    map[string][]time.Time
 	maxRequests int
 	window      time.Duration
-
 }
 
 // PeerInfo tracks peer reputation and status
@@ -82,9 +81,9 @@ type Node struct {
 	BootstrapAddrs []ma.Multiaddr
 
 	// Security and performance features
-	rateLimiter    *RateLimiter
-	peers          map[peer.ID]*PeerInfo
-	bannedPeers    map[peer.ID]time.Time
+	rateLimiter *RateLimiter
+	peers       map[peer.ID]*PeerInfo
+	bannedPeers map[peer.ID]time.Time
 
 	maxMemoryUsage int64
 	mu             sync.RWMutex
@@ -523,8 +522,6 @@ func (n *Node) handleBrowseStream(s network.Stream) {
 	}
 }
 
-
-
 func readAllWithTimeout(r io.Reader, timeout time.Duration) []byte {
 	// For network streams, try to read with a reasonable timeout
 	buf := make([]byte, 0, 2048)
@@ -773,8 +770,6 @@ func PubHex(pub ed25519.PublicKey) string {
 	return hex.EncodeToString(pub)
 }
 
-
-
 // Peer validation methods
 func (n *Node) validatePeer(peerID peer.ID) error {
 	if !n.config.EnablePeerValidation {
@@ -803,8 +798,6 @@ func (n *Node) validatePeer(peerID peer.ID) error {
 	return nil
 }
 
-
-
 func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
@@ -826,8 +819,6 @@ func (n *Node) updatePeerReputation(peerID peer.ID, delta int) {
 		}
 	}
 }
-
-
 
 func (n *Node) cleanupOldContent() {
 	// Implement LRU cleanup for old content
@@ -929,5 +920,3 @@ func (n *Node) handlePeerDisconnected(net network.Network, conn network.Conn) {
 	peerID := conn.RemotePeer()
 	n.logger.Info("peer disconnected", zap.String("peer", peerID.String()))
 }
-
-
