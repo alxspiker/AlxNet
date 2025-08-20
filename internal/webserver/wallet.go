@@ -31,7 +31,7 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	}
 
 	mux := http.NewServeMux()
-	
+
 	// Wallet management endpoints
 	mux.HandleFunc("/", ws.handleWalletHomepage)
 	mux.HandleFunc("/api/wallet/new", ws.handleCreateWallet)

@@ -27,7 +27,7 @@ func NewNodeServer(store *store.Store, node *p2p.Node, logger *zap.Logger, port 
 	}
 
 	mux := http.NewServeMux()
-	
+
 	// Node management endpoints
 	mux.HandleFunc("/", ws.handleNodeHomepage)
 	mux.HandleFunc("/api/node/status", ws.handleNodeStatus)
@@ -416,11 +416,11 @@ func (ws *WebServer) handleNodePeers(w http.ResponseWriter, r *http.Request) {
 
 func (ws *WebServer) handleNodeInfo(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
-		"node_id":     ws.node.Host.ID().String(),
-		"agent_name":  "betanet",
-		"version":     "1.0.0",
-		"protocols":   []string{"/betanet/1.0.0"},
-		"public_key":  ws.node.Host.ID().String(), // This would be the actual public key
+		"node_id":    ws.node.Host.ID().String(),
+		"agent_name": "betanet",
+		"version":    "1.0.0",
+		"protocols":  []string{"/betanet/1.0.0"},
+		"public_key": ws.node.Host.ID().String(), // This would be the actual public key
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -438,10 +438,10 @@ func (ws *WebServer) handleStorageStats(w http.ResponseWriter, r *http.Request) 
 	// Basic storage stats - in a real implementation, these would be tracked
 	stats := map[string]interface{}{
 		"success":       true,
-		"total_sites":   0,  // Would need to implement site counting
+		"total_sites":   0, // Would need to implement site counting
 		"total_domains": domainCount,
-		"storage_bytes": 0,  // Would need to implement storage tracking
-		"content_files": 0,  // Would need to implement file counting
+		"storage_bytes": 0, // Would need to implement storage tracking
+		"content_files": 0, // Would need to implement file counting
 	}
 
 	w.Header().Set("Content-Type", "application/json")
