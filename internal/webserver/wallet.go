@@ -487,13 +487,6 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 currentWallet = result.wallet;
                 currentMnemonic = result.mnemonic;
                 
-                showResult('wallet-result', 
-                    'Wallet created successfully!\\n\\n' +
-                    'IMPORTANT: Save this mnemonic phrase safely:\\n' +
-                    result.mnemonic + '\\n\\n' +
-                    'Wallet automatically saved and downloaded.'
-                );
-                
                 updateStatus();
                 
                 // Auto-save wallet with timestamp
@@ -502,11 +495,24 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 
                 try {
                     await apiCall('/api/wallet/save', 'POST', {
-                        wallet_data: JSON.stringify(result.wallet),
+                        wallet_data: result.encrypted,
                         name: walletName
                     });
+                    showResult('wallet-result', 
+                        'Wallet created successfully!\\n\\n' +
+                        'IMPORTANT: Save this mnemonic phrase safely:\\n' +
+                        result.mnemonic + '\\n\\n' +
+                        'Wallet automatically saved to data directory and downloaded.'
+                    );
                 } catch (saveError) {
-                    console.warn('Auto-save failed:', saveError);
+                    console.error('Auto-save failed:', saveError);
+                    showResult('wallet-result', 
+                        'Wallet created successfully!\\n\\n' +
+                        'IMPORTANT: Save this mnemonic phrase safely:\\n' +
+                        result.mnemonic + '\\n\\n' +
+                        'WARNING: Auto-save to data directory failed. Please save manually.\\n' +
+                        'Error: ' + saveError.message
+                    );
                 }
                 
                 // Create download link
@@ -614,19 +620,21 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         
         // Site functions
         async function loadSites() {
-            if (!currentWallet || !currentMnemonic) return;
+            if (!currentWallet) return;
             
             try {
-                const result = await apiCall('/api/wallet/sites', 'POST', {
-                    wallet_data: JSON.stringify(currentWallet),
-                    mnemonic: currentMnemonic
-                });
-                
                 const sitesList = document.getElementById('sites-list');
-                if (result.sites.length === 0) {
+                const sites = currentWallet.sites || {};
+                const siteArray = Object.keys(sites).map(label => ({
+                    label: label,
+                    site_id: sites[label].site_id || 'N/A',
+                    last_updated: sites[label].last_updated || new Date().toISOString()
+                }));
+                
+                if (siteArray.length === 0) {
                     sitesList.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No sites found. Create your first site!</p></div>';
                 } else {
-                    sitesList.innerHTML = result.sites.map(site => 
+                    sitesList.innerHTML = siteArray.map(site => 
                         '<div class="list-item" onclick="selectSiteFromList(\'' + site.label + '\')" data-label="' + site.label + '">' +
                             '<strong>' + site.label + '</strong><br>' +
                             '<small>ID: ' + site.site_id + '</small><br>' +
@@ -1004,11 +1012,18 @@ func (ws *WebServer) handleAddSite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Decrypt wallet
-	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
-	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
-		return
+	// Try to parse wallet data as JSON first (unencrypted), then try decryption
+	var walletData *wallet.Wallet
+	
+	// First try to unmarshal as unencrypted JSON
+	if err := json.Unmarshal([]byte(req.WalletData), &walletData); err != nil {
+		// If JSON parsing fails, try to decrypt
+		var decryptErr error
+		walletData, decryptErr = wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
+		if decryptErr != nil {
+			http.Error(w, "Failed to parse or decrypt wallet data", http.StatusBadRequest)
+			return
+		}
 	}
 
 	// Generate master key
@@ -1555,7 +1570,14 @@ func (ws *WebServer) handleLoadWalletFile(w http.ResponseWriter, r *http.Request
 
 	// Decrypt wallet if mnemonic provided
 	if req.Mnemonic != "" {
-		decryptedWallet, err := wallet.DecryptWallet(walletData, req.Mnemonic)
+		// Decode base64 wallet data
+		encryptedData, err := base64.StdEncoding.DecodeString(string(walletData))
+		if err != nil {
+			http.Error(w, "Invalid wallet file format", http.StatusBadRequest)
+			return
+		}
+		
+		decryptedWallet, err := wallet.DecryptWallet(encryptedData, req.Mnemonic)
 		if err != nil {
 			http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
 			return
