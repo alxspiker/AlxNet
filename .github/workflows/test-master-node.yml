@@ -3,7 +3,7 @@ name: Test Master Node - Global Discovery Network
 on:
   push:
     branches: [ main ]
-    paths: [ 'network/**', 'internal/network/**', 'cmd/betanet-network/**' ]
+    paths: [ 'network/**', 'internal/network/**', 'cmd/alxnet-network/**' ]
   workflow_dispatch:
     inputs:
       test_type:
@@ -38,11 +38,11 @@ jobs:
       with:
         go-version: '1.21'
         
-    - name: Build Betanet Network
+    - name: Build AlxNet Network
       run: |
         go mod tidy
-        go build -o bin/betanet-network ./cmd/betanet-network
-        go build -o bin/betanet-node ./cmd/betanet-node
+        go build -o bin/alxnet-network ./cmd/alxnet-network
+        go build -o bin/alxnet-node ./cmd/alxnet-node
         
     - name: Test Master List Accessibility
       run: |
@@ -59,19 +59,19 @@ jobs:
     - name: Test Network Discovery
       run: |
         echo "🔍 Testing network discovery from GitHub Actions..."
-        timeout 30s ./bin/betanet-network -command discover || true
+        timeout 30s ./bin/alxnet-network -command discover || true
         echo "✅ Discovery test completed"
         
     - name: Test Peer Listing
       run: |
         echo "📋 Testing peer listing from GitHub Actions..."
-        timeout 30s ./bin/betanet-network -command peers -limit 5 || true
+        timeout 30s ./bin/alxnet-network -command peers -limit 5 || true
         echo "✅ Peer listing test completed"
         
     - name: Test Network Health
       run: |
         echo "💚 Testing network health from GitHub Actions..."
-        timeout 30s ./bin/betanet-network -command health || true
+        timeout 30s ./bin/alxnet-network -command health || true
         echo "✅ Health monitoring test completed"
         
     - name: Test Cross-Internet Sync
@@ -83,7 +83,7 @@ jobs:
         
         # Start master node (simulating your local node)
         echo "🚀 Starting master node..."
-        timeout 60s ./bin/betanet-node run -data /tmp/master -listen /ip4/0.0.0.0/tcp/4001 &
+        timeout 60s ./bin/alxnet-node run -data /tmp/master -listen /ip4/0.0.0.0/tcp/4001 &
         MASTER_PID=$!
         sleep 5
         
@@ -95,7 +95,7 @@ jobs:
         echo "🔗 Starting test nodes..."
         for i in {1..3}; do
           echo "Starting test node $i..."
-          timeout 60s ./bin/betanet-node run \
+          timeout 60s ./bin/alxnet-node run \
             -data "/tmp/node$i" \
             -listen "/ip4/0.0.0.0/tcp/400$((i+1))" \
             -bootstrap "$MASTER_ADDR" &
@@ -108,10 +108,10 @@ jobs:
         
         # Test network status
         echo "📊 Testing network status..."
-        ./bin/betanet-network -command status
+        ./bin/alxnet-network -command status
         
         # Cleanup
-        pkill -f betanet-node || true
+        pkill -f alxnet-node || true
         echo "✅ Cross-internet sync test completed"
         
     - name: Test Master Node Reliability
@@ -121,7 +121,7 @@ jobs:
         # Test multiple discovery attempts
         for i in {1..5}; do
           echo "Discovery attempt $i..."
-          timeout 10s ./bin/betanet-network -command discover || true
+          timeout 10s ./bin/alxnet-network -command discover || true
           sleep 2
         done
         
@@ -171,12 +171,12 @@ jobs:
       run: |
         echo "🧪 Testing network stability..."
         go mod tidy
-        go build -o bin/betanet-network ./cmd/betanet-network
+        go build -o bin/alxnet-network ./cmd/alxnet-network
         
         # Test network manager stability
         for i in {1..10}; do
           echo "Stability test $i..."
-          timeout 15s ./bin/betanet-network -command status || true
+          timeout 15s ./bin/alxnet-network -command status || true
           sleep 1
         done
         
@@ -188,7 +188,7 @@ jobs:
         
         # Simulate multiple concurrent requests
         for i in {1..20}; do
-          (timeout 10s ./bin/betanet-network -command health || true) &
+          (timeout 10s ./bin/alxnet-network -command health || true) &
         done
         
         wait
@@ -203,7 +203,7 @@ jobs:
     - name: Deploy Master Node Status
       run: |
         echo "🚀 Deploying master node status..."
-        echo "## 🌐 Betanet Master Node Status" >> master-node-status.md
+        echo "## 🌐 AlxNet Master Node Status" >> master-node-status.md
         echo "**Repository:** ${{ github.repository }}" >> master-node-status.md
         echo "**Status:** 🟢 OPERATIONAL" >> master-node-status.md
         echo "**Last Test:** $(date)" >> master-node-status.md

@@ -10,15 +10,15 @@ import (
 	"strings"
 	"time"
 
-	"betanet/internal/core"
-	"betanet/internal/p2p"
-	"betanet/internal/store"
+	"alxnet/internal/core"
+	"alxnet/internal/p2p"
+	"alxnet/internal/store"
 
 	"github.com/fxamacker/cbor/v2"
 	"go.uber.org/zap"
 )
 
-// WebServer serves web interfaces for Betanet
+// WebServer serves web interfaces for AlxNet
 type WebServer struct {
 	store  *store.Store
 	node   *p2p.Node
@@ -47,7 +47,7 @@ func NewBrowserServer(store *store.Store, node *p2p.Node, logger *zap.Logger, po
 	mux.HandleFunc("/api/sites", ws.handleAPISites)
 	mux.HandleFunc("/api/site/", ws.handleAPISite)
 	mux.HandleFunc("/api/browse/", ws.handleAPIBrowse)
-	mux.HandleFunc("/_betanet/status", ws.handleStatus)
+	mux.HandleFunc("/_alxnet/status", ws.handleStatus)
 
 	ws.server = &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),
@@ -63,7 +63,7 @@ func NewBrowserServer(store *store.Store, node *p2p.Node, logger *zap.Logger, po
 // Start starts the web server
 func (ws *WebServer) Start() error {
 	go func() {
-		ws.logger.Info("starting betanet web server", zap.Int("port", ws.port))
+		ws.logger.Info("starting alxnet web server", zap.Int("port", ws.port))
 		if err := ws.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			ws.logger.Error("web server error", zap.Error(err))
 		}
@@ -88,7 +88,7 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 	urlParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
 	if len(urlParts) == 0 || urlParts[0] == "" {
-		ws.serveBetanetHomepage(w, r)
+		ws.serveAlxNetHomepage(w, r)
 		return
 	}
 
@@ -122,8 +122,8 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 
 	// Set appropriate headers
 	w.Header().Set("Content-Type", mimeType)
-	w.Header().Set("X-Betanet-Site-ID", siteID)
-	w.Header().Set("X-Betanet-File-Path", filePath)
+	w.Header().Set("X-AlxNet-Site-ID", siteID)
+	w.Header().Set("X-AlxNet-File-Path", filePath)
 
 	// Enable CORS for API access
 	w.Header().Set("Access-Control-Allow-Origin", "*")
@@ -254,14 +254,14 @@ func (ws *WebServer) getMimeType(filePath string) string {
 	return mimeType
 }
 
-// serveBetanetHomepage serves the Betanet homepage
-func (ws *WebServer) serveBetanetHomepage(w http.ResponseWriter, r *http.Request) {
+// serveAlxNetHomepage serves the AlxNet homepage
+func (ws *WebServer) serveAlxNetHomepage(w http.ResponseWriter, r *http.Request) {
 	homepage := `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Betanet - Decentralized Web Browser</title>
+    <title>AlxNet - Decentralized Web Browser</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -323,7 +323,7 @@ func (ws *WebServer) serveBetanetHomepage(w http.ResponseWriter, r *http.Request
 <body>
     <div class="container">
         <div class="header">
-            <h1>🌐 Betanet</h1>
+            <h1>🌐 AlxNet</h1>
             <p>Decentralized Web Browser & Platform</p>
         </div>
         
@@ -359,7 +359,7 @@ func (ws *WebServer) serveBetanetHomepage(w http.ResponseWriter, r *http.Request
                 <li><code>/api/sites</code> - List all available sites</li>
                 <li><code>/api/site/{siteID}</code> - Get site information</li>
                 <li><code>/{siteID}/{filepath}</code> - Browse site content</li>
-                <li><code>/_betanet/status</code> - Server status</li>
+                <li><code>/_alxnet/status</code> - Server status</li>
             </ul>
         </div>
     </div>
@@ -393,7 +393,7 @@ func (ws *WebServer) serveBetanetHomepage(w http.ResponseWriter, r *http.Request
 // handleStatus serves server status information
 func (ws *WebServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
-		"server":    "betanet-webserver",
+		"server":    "alxnet-webserver",
 		"version":   "1.0.0",
 		"timestamp": time.Now().Unix(),
 		"uptime":    time.Since(time.Now()).String(), // This would need proper tracking

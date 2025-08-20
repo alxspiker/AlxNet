@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"betanet/internal/p2p"
-	"betanet/internal/store"
+	"alxnet/internal/p2p"
+	"alxnet/internal/store"
 
 	"go.uber.org/zap"
 )
@@ -56,7 +56,7 @@ func (ws *WebServer) handleNodeHomepage(w http.ResponseWriter, r *http.Request) 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Betanet Node Management</title>
+    <title>AlxNet Node Management</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -136,7 +136,7 @@ func (ws *WebServer) handleNodeHomepage(w http.ResponseWriter, r *http.Request) 
     <div class="container">
         <div class="header">
             <h1>🔗 Node Management</h1>
-            <p>Monitor and manage your Betanet P2P node</p>
+            <p>Monitor and manage your AlxNet P2P node</p>
         </div>
         
         <div class="section">
@@ -374,7 +374,7 @@ func (ws *WebServer) handleNodeStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := map[string]interface{}{
-		"server":           "betanet-node-ui",
+		"server":           "alxnet-node-ui",
 		"version":          "1.0.0",
 		"timestamp":        time.Now().Unix(),
 		"uptime_seconds":   time.Since(time.Now()).Seconds(), // This would need proper tracking
@@ -426,9 +426,9 @@ func (ws *WebServer) handleNodePeers(w http.ResponseWriter, r *http.Request) {
 func (ws *WebServer) handleNodeInfo(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
 		"node_id":    ws.node.Host.ID().String(),
-		"agent_name": "betanet",
+		"agent_name": "alxnet",
 		"version":    "1.0.0",
-		"protocols":  []string{"/betanet/1.0.0"},
+		"protocols":  []string{"/alxnet/1.0.0"},
 		"public_key": ws.node.Host.ID().String(), // This would be the actual public key
 	}
 

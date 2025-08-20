@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"betanet/internal/core"
+	"alxnet/internal/core"
 
 	"github.com/tyler-smith/go-bip39"
 	"go.uber.org/zap"
@@ -26,9 +26,9 @@ import (
 const (
 	walletVersion = 1
 	kdfName       = "argon2id"
-	adWallet      = "bn-wallet-v1"
-	adContent     = "bn-content-v1"
-	contentHdr    = "BNE1" // 4 bytes
+	adWallet      = "ax-wallet-v1"
+	adContent     = "ax-content-v1"
+	contentHdr    = "AXE1" // 4 bytes
 
 	// Security constants
 	MinMnemonicLength   = 12
@@ -238,7 +238,7 @@ func masterKeyFromMnemonic(mnemonic string) ([]byte, error) {
 	}
 
 	seed := bip39.NewSeed(mnemonic, "")
-	h := hkdf.New(sha256.New, seed, []byte("bn-wallet-v1"), []byte("master"))
+	h := hkdf.New(sha256.New, seed, []byte("ax-wallet-v1"), []byte("master"))
 	key := make([]byte, 32)
 	if _, err := io.ReadFull(h, key); err != nil {
 		return nil, err
@@ -259,7 +259,7 @@ func DeriveSiteKey(master []byte, label string) (ed25519.PublicKey, ed25519.Priv
 		return nil, nil, fmt.Errorf("label too long: %d > %d", len(label), MaxLabelLength)
 	}
 
-	h := hkdf.New(sha256.New, master, []byte("bn-site"), []byte(strings.ToLower(label)))
+	h := hkdf.New(sha256.New, master, []byte("ax-site"), []byte(strings.ToLower(label)))
 	seed := make([]byte, 32)
 	if _, err := io.ReadFull(h, seed); err != nil {
 		return nil, nil, err

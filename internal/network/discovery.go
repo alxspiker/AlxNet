@@ -43,8 +43,8 @@ type DiscoveryConfig struct {
 // DefaultDiscoveryConfig returns default discovery configuration
 func DefaultDiscoveryConfig() *DiscoveryConfig {
 	return &DiscoveryConfig{
-		GitHubMasterListURL: "https://raw.githubusercontent.com/alxspiker/betanet/main/network/masterlist.json",
-		LocalMasterListPath: "~/.betanet/network/local-masterlist.json",
+		GitHubMasterListURL: "https://raw.githubusercontent.com/alxspiker/alxnet/main/network/masterlist.json",
+		LocalMasterListPath: "~/.alxnet/network/local-masterlist.json",
 		UpdateInterval:      5 * time.Minute,
 		MaxRetries:          3,
 		RetryDelay:          30 * time.Second,
@@ -159,7 +159,7 @@ func (ds *DiscoveryService) RefreshMasterList(ctx context.Context) error {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("User-Agent", "Betanet-Discovery/1.0")
+	req.Header.Set("User-Agent", "AlxNet-Discovery/1.0")
 
 	resp, err := ds.httpClient.Do(req)
 	if err != nil {

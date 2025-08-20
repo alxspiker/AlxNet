@@ -1,8 +1,8 @@
 {
   "version": "1.0",
   "last_updated": "2025-08-12T05:34:00Z",
-  "network_name": "Betanet Global Network",
-  "description": "Curated master nodes for the Betanet decentralized web platform",
+  "network_name": "AlxNet Global Network",
+  "description": "Curated master nodes for the AlxNet decentralized web platform",
   "master_nodes": [
     {
       "id": "12D3KooWNE3V2wN3mi91ENjg3LpgfebHgvCqnU7njw24iAdbfeD9",
@@ -11,7 +11,7 @@
       "reliability_score": 0.95,
       "last_seen": "2025-08-12T05:34:00Z",
       "capabilities": ["storage", "relay", "bootstrap", "master"],
-      "contact": "local@betanet.dev",
+      "contact": "local@alxnet.dev",
       "description": "Local development master node for testing cross-internet connectivity"
     }
   ],
@@ -40,5 +40,5 @@
     }
   },
   "update_frequency": "1h",
-  "github_repo": "https://github.com/alxspiker/betanet/network/masterlist.json"
+  "github_repo": "https://github.com/alxspiker/alxnet/network/masterlist.json"
 }

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Betanet Dashboard Launcher
+# AlxNet Dashboard Launcher
 # Launches the unified dashboard for complete system management
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DASHBOARD_BIN="$ROOT_DIR/bin/betanet-dashboard"
-DEFAULT_DATA_DIR="$HOME/.betanet/dashboard"
+DASHBOARD_BIN="$ROOT_DIR/bin/alxnet-dashboard"
+DEFAULT_DATA_DIR="$HOME/.alxnet/dashboard"
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -23,7 +23,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
 # Show usage
 show_usage() {
-    echo "🌐 Betanet Dashboard Launcher"
+    echo "🌐 AlxNet Dashboard Launcher"
     echo "=============================="
     echo ""
     echo "Usage:"
@@ -44,7 +44,7 @@ show_usage() {
     echo ""
     echo "Examples:"
     echo "  $0                           # Use default data directory"
-    echo "  $0 -data /opt/betanet/data   # Use custom data directory"
+    echo "  $0 -data /opt/alxnet/data   # Use custom data directory"
     echo ""
 }
 
@@ -57,7 +57,7 @@ check_dashboard() {
         echo "  ./build.sh"
         echo ""
         echo "Or build just the dashboard:"
-        echo "  go build -o bin/betanet-dashboard ./cmd/betanet-dashboard"
+        echo "  go build -o bin/alxnet-dashboard ./cmd/alxnet-dashboard"
         echo ""
         exit 1
     fi
@@ -89,7 +89,7 @@ setup_data_dir() {
 launch_dashboard() {
     local data_dir="$1"
     
-    log_info "Launching Betanet Dashboard..."
+    log_info "Launching AlxNet Dashboard..."
     log_info "Data directory: $data_dir"
     echo ""
     
@@ -99,7 +99,7 @@ launch_dashboard() {
     # Launch dashboard
     log_success "Starting dashboard..."
     echo ""
-    echo "🌐 Betanet Dashboard is starting..."
+    echo "🌐 AlxNet Dashboard is starting..."
     echo "   This may take a few seconds on first launch."
     echo ""
     

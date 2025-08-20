@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"betanet/internal/core"
-	bncrypto "betanet/internal/crypto"
-	"betanet/internal/store"
+	"alxnet/internal/core"
+	bncrypto "alxnet/internal/crypto"
+	"alxnet/internal/store"
 
 	"github.com/fxamacker/cbor/v2"
 	libp2p "github.com/libp2p/go-libp2p"
@@ -29,8 +29,8 @@ import (
 	"go.uber.org/zap"
 )
 
-const Topic = "betanet/updates/v1"
-const BrowseProto protocol.ID = "/betanet/browse/1.0.0"
+const Topic = "alxnet/updates/v1"
+const BrowseProto protocol.ID = "/alxnet/browse/1.0.0"
 
 // Security and performance constants
 const (
@@ -234,7 +234,7 @@ func (n *Node) Start(ctx context.Context) error {
 		}
 	}()
 	// Enable mDNS advertise/respond on LAN so Browser auto-discovery can find this node
-	_ = mdns.NewMdnsService(n.Host, "betanet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
+	_ = mdns.NewMdnsService(n.Host, "alxnet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
 		log.Printf("mDNS: discovered peer %s", pi.ID)
 	}})
 	// Attempt to connect to bootstrap peers, if any
@@ -549,7 +549,7 @@ func readAllWithTimeout(r io.Reader, timeout time.Duration) []byte {
 // DiscoverBestPeer finds the lowest RTT mDNS peer within the timeout.
 func (n *Node) DiscoverBestPeer(ctx context.Context, timeout time.Duration) (*peer.AddrInfo, error) {
 	found := make(chan peer.AddrInfo, 32)
-	_ = mdns.NewMdnsService(n.Host, "betanet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
+	_ = mdns.NewMdnsService(n.Host, "alxnet-mdns", &mdnsNotifee{cb: func(pi peer.AddrInfo) {
 		log.Printf("mDNS discovery: found peer %s with addrs %v", pi.ID, pi.Addrs)
 		select {
 		case found <- pi:
@@ -583,7 +583,7 @@ func (n *Node) DiscoverBestPeer(ctx context.Context, timeout time.Duration) (*pe
 	return best, nil
 }
 
-// DiscoverLocalhostPeer tries to find betanet nodes on common localhost ports
+// DiscoverLocalhostPeer tries to find alxnet nodes on common localhost ports
 func (n *Node) DiscoverLocalhostPeer(ctx context.Context) (*peer.AddrInfo, error) {
 	log.Printf("Trying localhost discovery on common ports...")
 

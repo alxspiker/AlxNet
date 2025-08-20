@@ -1,4 +1,4 @@
-# 🌐 Betanet - Decentralized Web Platform
+# 🌐 AlxNet - Decentralized Web Platform
 
 **A decentralized web platform that supports multi-file websites with HTML, CSS, JavaScript, and images - all stored on the blockchain with cryptographic security.**
 
@@ -7,9 +7,9 @@
 [![Status](https://img.shields.io/badge/Status-Working%20Prototype-orange.svg)]()
 [![Security](https://img.shields.io/badge/Security-Hardened-red.svg)]()
 
-## 🚀 What is Betanet?
+## 🚀 What is AlxNet?
 
-Betanet is a **decentralized, censorship-resistant web platform** that replaces traditional centralized web infrastructure with peer-to-peer technology. This implementation provides:
+AlxNet is a **decentralized, censorship-resistant web platform** that replaces traditional centralized web infrastructure with peer-to-peer technology. This implementation provides:
 
 - **🌍 Multi-File Websites** - Complete websites with HTML, CSS, JavaScript, and images
 - **🔐 Cryptographic Identity** - Ed25519-based site ownership and updates
@@ -118,8 +118,8 @@ Betanet is a **decentralized, censorship-resistant web platform** that replaces 
 
 ### Quick Install
 ```bash
-git clone https://github.com/yourusername/betanet.git
-cd betanet
+git clone https://github.com/yourusername/alxnet.git
+cd alxnet
 ./build.sh
 ```
 
@@ -134,17 +134,17 @@ cd betanet
 
 ### 🌐 **Single Unified Command** - Complete Platform Integration
 
-**Start the complete Betanet platform with one command:**
+**Start the complete AlxNet platform with one command:**
 
 ```bash
 # Start the complete platform (all services integrated)
-./betanet start
+./alxnet start
 
 # Or customize ports for multiple instances
-./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
+./alxnet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 ```
 
-**🎯 What happens when you run `betanet start`:**
+**🎯 What happens when you run `alxnet start`:**
 - **P2P Network Node** automatically starts on port 4001 (or specified port)
 - **🌐 Browser Interface** launches at http://localhost:8080 - Browse decentralized websites
 - **💰 Wallet Management** launches at http://localhost:8081 - Create/manage wallets and sites  
@@ -152,7 +152,7 @@ cd betanet
 
 ### **Creating Your First Website**
 
-1. **Start Betanet**: `./betanet start`
+1. **Start AlxNet**: `./alxnet start`
 2. **Open Wallet Interface**: Navigate to http://localhost:8081
 3. **Create Wallet**: Click "Create New Wallet" → Save the mnemonic phrase securely
 4. **Navigate to Sites**: Click "Sites" tab → Create your first site
@@ -161,9 +161,9 @@ cd betanet
 7. **Browse**: Visit http://localhost:8080 and enter your site ID to view
 ## 🎯 Core Components
 
-### **🚀 betanet** - Unified Platform Command
+### **🚀 alxnet** - Unified Platform Command
 
-The **single command** that provides the complete Betanet experience:
+The **single command** that provides the complete AlxNet experience:
 
 **🌐 Browser Interface (Port 8080)**
 - Browse decentralized websites by Site ID
@@ -177,7 +177,7 @@ The **single command** that provides the complete Betanet experience:
 - **Wallet operations**: Create wallets with mnemonic generation, secure storage
 - **Site management**: Create sites, manage cryptographic keys
 - **Multi-file publishing**: Complete website publishing with HTML/CSS/JS/images
-- **Domain registration**: Human-readable `.bn` domain names
+- **Domain registration**: Human-readable `.alx` domain names
 
 **🔗 Node Management Interface (Port 8082)**
 - **Real-time P2P monitoring**: Live node status and connection metrics  
@@ -195,10 +195,10 @@ The **single command** that provides the complete Betanet experience:
 ### **Multi-Instance Development Setup**
 ```bash
 # Start first instance (development)
-./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
+./alxnet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 
 # Start second instance (testing) 
-./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
+./alxnet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 ```
 
 ### **Configuration Management**
@@ -210,7 +210,7 @@ export BETANET_MAX_PEERS=200
 export BETANET_MAX_CONTENT_SIZE=20971520  # 20MB
 
 # Or use configuration file
-./bin/betanet-node run -config config.yaml
+./bin/alxnet-node run -config config.yaml
 ```
 
 **Example config.yaml:**
@@ -229,7 +229,7 @@ security:
   ban_duration: 30m
 
 storage:
-  data_dir: "/var/lib/betanet"
+  data_dir: "/var/lib/alxnet"
   max_retries: 5
   cleanup_interval: 10m
 ```
@@ -270,13 +270,13 @@ echo "console.log('...');" > mywebsite/js/app.js
 ### **Domain Name System**
 ```bash
 # All domain management is now done through the web interface:
-# 1. Start Betanet: ./betanet start  
+# 1. Start AlxNet: ./alxnet start  
 # 2. Open Wallet Management: http://localhost:8081
 # 3. Create/load wallet → Create site → Register domain through UI
 
 # Domain format validation
-# ✅ Valid: mysite.bn, blog123.bn, news2024.bn
-# ❌ Invalid: my-site.bn, site.bn, my.site.bn
+# ✅ Valid: mysite.alx, blog123.alx, news2024.alx
+# ❌ Invalid: my-site.alx, site.alx, my.site.alx
 ```
 
 ### **Content Encryption**
@@ -290,13 +290,13 @@ echo "console.log('...');" > mywebsite/js/app.js
 ### **Network Configuration**
 ```bash
 # Start with custom node configuration
-./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
+./alxnet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 
 # Connect to specific bootstrap peer (bootstrap peer management through Node UI)
-./betanet start -bootstrap /ip4/127.0.0.1/tcp/4002/p2p/12D3KooW...
+./alxnet start -bootstrap /ip4/127.0.0.1/tcp/4002/p2p/12D3KooW...
 
 # Start second instance for testing
-./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
+./alxnet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 ```
 
 ## 🏗️ Architecture
@@ -304,7 +304,7 @@ echo "console.log('...');" > mywebsite/js/app.js
 ### **Unified Platform Architecture**
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        betanet start                           │
+│                        alxnet start                           │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
 │  │   Browser UI    │  │   Wallet UI     │  │   Node UI       │ │
 │  │   (Port 8080)   │  │   (Port 8081)   │  │   (Port 8082)   │ │
@@ -324,7 +324,7 @@ echo "console.log('...');" > mywebsite/js/app.js
                     └─────────────────┘
                                  │
                     ┌─────────────────┐
-                    │ betanet-dashboard│
+                    │ alxnet-dashboard│
                     │ (Unified UI)    │
                     └─────────────────┘
 ```
@@ -333,7 +333,7 @@ echo "console.log('...');" > mywebsite/js/app.js
 1. **Website Creation** → Wallet creates site and website manifest
 2. **File Publishing** → Individual files stored with cryptographic signatures
 3. **Manifest Updates** → Website manifest links all files together
-4. **Domain Registration** → Wallet registers `.bn` domain
+4. **Domain Registration** → Wallet registers `.alx` domain
 5. **Content Distribution** → GossipSub distributes to peers
 6. **Content Discovery** → Browser resolves domain to site ID
 7. **Website Retrieval** → Node fetches all website files and manifest
@@ -352,23 +352,23 @@ echo "console.log('...');" > mywebsite/js/app.js
 
 **"Port already in use"**
 ```bash
-# Kill any running Betanet instances
-pkill -f betanet
+# Kill any running AlxNet instances
+pkill -f alxnet
 
 # Start with different ports
-./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
+./alxnet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 ```
 
 **"Cannot connect to peer network"**
 ```bash
-# Check if Betanet is running
-./betanet start
+# Check if AlxNet is running
+./alxnet start
 
 # Monitor node status through Node Management interface
 # Open: http://localhost:8082
 
 # Use bootstrap peers for testing
-./betanet start -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
+./alxnet start -bootstrap /ip4/127.0.0.1/tcp/4001/p2p/12D3KooW...
 ```
 
 **"Website files not loading"**
@@ -384,7 +384,7 @@ pkill -f betanet
 ```bash
 # Enable verbose logging
 export BETANET_DEBUG=1
-./betanet start
+./alxnet start
 
 # Monitor through web interfaces:
 # - Node status: http://localhost:8082
@@ -422,11 +422,11 @@ go tool cover -html=coverage.out -o coverage.html
 
 ### **Local Development Setup**
 ```bash
-# Terminal 1: Start first Betanet instance (development)
-./betanet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
+# Terminal 1: Start first AlxNet instance (development)
+./alxnet start -node-port 4001 -browser-port 8080 -wallet-port 8081 -node-ui-port 8082
 
 # Terminal 2: Start second instance (testing)  
-./betanet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
+./alxnet start -node-port 4002 -browser-port 8090 -wallet-port 8091 -node-ui-port 8092
 
 # Open web interfaces:
 # Instance 1: http://localhost:8081 (wallet), http://localhost:8080 (browser)
@@ -497,8 +497,8 @@ type Node interface {
 
 ### **Development Setup**
 ```bash
-git clone https://github.com/yourusername/betanet.git
-cd betanet
+git clone https://github.com/yourusername/alxnet.git
+cd alxnet
 go mod tidy
 go test ./...
 ```
@@ -533,12 +533,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-- **Issues** - [GitHub Issues](https://github.com/yourusername/betanet/issues)
-- **Discussions** - [GitHub Discussions](https://github.com/yourusername/betanet/discussions)
-- **Documentation** - [Wiki](https://github.com/yourusername/betanet/wiki)
+- **Issues** - [GitHub Issues](https://github.com/yourusername/alxnet/issues)
+- **Discussions** - [GitHub Discussions](https://github.com/yourusername/alxnet/discussions)
+- **Documentation** - [Wiki](https://github.com/yourusername/alxnet/wiki)
 
 ---
 
-**🌐 Betanet - Building the decentralized web with complete multi-file websites.**
+**🌐 AlxNet - Building the decentralized web with complete multi-file websites.**
 
 *Now featuring a unified dashboard for complete system management - all operations accessible from one intuitive interface.*

@@ -7,12 +7,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
-	"betanet/internal/core"
-	"betanet/internal/p2p"
-	"betanet/internal/store"
-	"betanet/internal/wallet"
+	"alxnet/internal/core"
+	"alxnet/internal/p2p"
+	"alxnet/internal/store"
+	"alxnet/internal/wallet"
 
 	"go.uber.org/zap"
 )
@@ -36,6 +39,7 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	mux.HandleFunc("/", ws.handleWalletHomepage)
 	mux.HandleFunc("/api/wallet/new", ws.handleCreateWallet)
 	mux.HandleFunc("/api/wallet/load", ws.handleLoadWallet)
+	mux.HandleFunc("/api/wallet/load-file", ws.handleLoadWalletFile)
 	mux.HandleFunc("/api/wallet/list", ws.handleListWallets)
 	mux.HandleFunc("/api/wallet/save", ws.handleSaveWallet)
 	mux.HandleFunc("/api/wallet/sites", ws.handleWalletSites)
@@ -71,7 +75,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Betanet Wallet Management</title>
+    <title>AlxNet Wallet Management</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { 
@@ -278,7 +282,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
 <body>
     <div class="container">
         <div class="header">
-            <h1>💰 Betanet Wallet</h1>
+            <h1>💰 AlxNet Wallet</h1>
             <p>Manage wallets, sites, and decentralized content</p>
         </div>
         
@@ -309,7 +313,14 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 <div>
                     <h3>Load Existing Wallet</h3>
                     <div class="form-group">
-                        <label>Wallet File (JSON):</label>
+                        <label>Saved Wallets:</label>
+                        <select id="saved-wallets">
+                            <option value="">Loading saved wallets...</option>
+                        </select>
+                        <button onclick="loadSavedWallet()" style="margin-left: 0.5rem;">Load Selected</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Or Upload Wallet File (JSON):</label>
                         <input type="file" id="walletFile" accept=".json">
                     </div>
                     <div class="form-group">
@@ -317,7 +328,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                         <input type="password" id="mnemonic" placeholder="Enter your mnemonic phrase">
                     </div>
                     <div class="form-group">
-                        <button onclick="loadWallet()">Load Wallet</button>
+                        <button onclick="loadWallet()">Load Wallet File</button>
                     </div>
                 </div>
             </div>
@@ -397,6 +408,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             updateStatus();
+            loadWalletList();
         });
         
         // Navigation
@@ -479,10 +491,23 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                     'Wallet created successfully!\\n\\n' +
                     'IMPORTANT: Save this mnemonic phrase safely:\\n' +
                     result.mnemonic + '\\n\\n' +
-                    'Download your wallet file to load it later.'
+                    'Wallet automatically saved and downloaded.'
                 );
                 
                 updateStatus();
+                
+                // Auto-save wallet with timestamp
+                const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+                const walletName = 'wallet_' + timestamp;
+                
+                try {
+                    await apiCall('/api/wallet/save', 'POST', {
+                        wallet_data: JSON.stringify(result.wallet),
+                        name: walletName
+                    });
+                } catch (saveError) {
+                    console.warn('Auto-save failed:', saveError);
+                }
                 
                 // Create download link
                 const walletData = JSON.stringify(result.wallet, null, 2);
@@ -490,9 +515,12 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'betanet-wallet.json';
+                a.download = 'alxnet-wallet.json';
                 a.click();
                 URL.revokeObjectURL(url);
+                
+                // Refresh wallet list
+                loadWalletList();
                 
             } catch (error) {
                 showResult('wallet-result', 'Error: ' + error.message, 'error');
@@ -520,6 +548,61 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 
                 showResult('wallet-result', 
                     'Wallet loaded successfully!\\nSites found: ' + result.sites.length
+                );
+                
+                updateStatus();
+                
+            } catch (error) {
+                showResult('wallet-result', 'Error: ' + error.message, 'error');
+            }
+        }
+        
+        // Load wallet list from saved files
+        async function loadWalletList() {
+            try {
+                const result = await apiCall('/api/wallet/list');
+                const walletSelect = document.getElementById('saved-wallets');
+                
+                if (result.wallets.length === 0) {
+                    walletSelect.innerHTML = '<option value="">No saved wallets found</option>';
+                } else {
+                    walletSelect.innerHTML = '<option value="">Select a saved wallet...</option>' +
+                        result.wallets.map(wallet => 
+                            '<option value="' + wallet.filename + '">' + wallet.name + ' (' + wallet.created + ')</option>'
+                        ).join('');
+                }
+            } catch (error) {
+                console.error('Failed to load wallet list:', error);
+            }
+        }
+        
+        // Load wallet from saved file
+        async function loadSavedWallet() {
+            const walletSelect = document.getElementById('saved-wallets');
+            const mnemonicInput = document.getElementById('mnemonic');
+            
+            if (!walletSelect.value) {
+                showResult('wallet-result', 'Please select a wallet', 'error');
+                return;
+            }
+            
+            if (!mnemonicInput.value) {
+                showResult('wallet-result', 'Please enter your mnemonic phrase', 'error');
+                return;
+            }
+            
+            try {
+                const result = await apiCall('/api/wallet/load-file', 'POST', {
+                    filename: walletSelect.value,
+                    mnemonic: mnemonicInput.value
+                });
+                
+                currentWallet = result.wallet;
+                currentMnemonic = mnemonicInput.value;
+                
+                showResult('wallet-result', 
+                    'Wallet loaded successfully from saved file!\\n' +
+                    'Sites found: ' + Object.keys(result.wallet.sites || {}).length
                 );
                 
                 updateStatus();
@@ -1288,7 +1371,7 @@ func (ws *WebServer) handleGetWebsiteInfo(w http.ResponseWriter, r *http.Request
 
 func (ws *WebServer) handleWalletStatus(w http.ResponseWriter, r *http.Request) {
 	status := map[string]interface{}{
-		"server":    "betanet-wallet",
+		"server":    "alxnet-wallet",
 		"version":   "1.0.0",
 		"timestamp": time.Now().Unix(),
 		"node_id":   ws.node.Host.ID().String(),
@@ -1317,12 +1400,47 @@ func (ws *WebServer) handleListWallets(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For now, return empty list since wallets are stored in memory/download
-	// In a full implementation, you'd scan a wallets directory
+	// Get data directory from store
+	dataDir := ws.store.GetDataDir()
+	walletsDir := filepath.Join(dataDir, "wallets")
+	
+	// Ensure wallets directory exists
+	if err := os.MkdirAll(walletsDir, 0755); err != nil {
+		http.Error(w, "Failed to create wallets directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Scan for wallet files
+	files, err := os.ReadDir(walletsDir)
+	if err != nil {
+		http.Error(w, "Failed to read wallets directory", http.StatusInternalServerError)
+		return
+	}
+
+	var walletList []map[string]interface{}
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".wallet") {
+			continue
+		}
+		
+		// Get file info
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+		
+		walletName := strings.TrimSuffix(file.Name(), ".wallet")
+		walletList = append(walletList, map[string]interface{}{
+			"name":     walletName,
+			"filename": file.Name(),
+			"created":  info.ModTime().Format("2006-01-02 15:04:05"),
+			"size":     info.Size(),
+		})
+	}
+
 	response := map[string]interface{}{
 		"success": true,
-		"wallets": []interface{}{},
-		"message": "No persistent wallet storage implemented yet. Use wallet download/upload.",
+		"wallets": walletList,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -1348,16 +1466,125 @@ func (ws *WebServer) handleSaveWallet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For now, just return success since we don't persist wallets to disk
+	if req.Name == "" {
+		http.Error(w, "Wallet name is required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate wallet name (only alphanumeric and safe characters)
+	for _, char := range req.Name {
+		if !((char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || 
+			 (char >= '0' && char <= '9') || char == '-' || char == '_') {
+			http.Error(w, "Wallet name can only contain letters, numbers, hyphens and underscores", http.StatusBadRequest)
+			return
+		}
+	}
+
+	// Get data directory from store
+	dataDir := ws.store.GetDataDir()
+	walletsDir := filepath.Join(dataDir, "wallets")
+	
+	// Ensure wallets directory exists
+	if err := os.MkdirAll(walletsDir, 0755); err != nil {
+		http.Error(w, "Failed to create wallets directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Save wallet file
+	walletPath := filepath.Join(walletsDir, req.Name+".wallet")
+	if err := os.WriteFile(walletPath, []byte(req.WalletData), 0600); err != nil {
+		http.Error(w, "Failed to save wallet file", http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]interface{}{
 		"success": true,
-		"message": "Wallet save functionality not implemented yet. Please download your wallet file.",
+		"message": fmt.Sprintf("Wallet '%s' saved successfully", req.Name),
+		"path":    walletPath,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
+	}
+}
+
+func (ws *WebServer) handleLoadWalletFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		Filename string `json:"filename"`
+		Mnemonic string `json:"mnemonic"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	if req.Filename == "" {
+		http.Error(w, "Filename is required", http.StatusBadRequest)
+		return
+	}
+
+	// Get data directory from store
+	dataDir := ws.store.GetDataDir()
+	walletsDir := filepath.Join(dataDir, "wallets")
+	walletPath := filepath.Join(walletsDir, req.Filename)
+
+	// Check if file exists and is in the wallets directory
+	if !strings.HasPrefix(walletPath, walletsDir) {
+		http.Error(w, "Invalid wallet file path", http.StatusBadRequest)
+		return
+	}
+
+	// Read wallet file
+	walletData, err := os.ReadFile(walletPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			http.Error(w, "Wallet file not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "Failed to read wallet file", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Decrypt wallet if mnemonic provided
+	if req.Mnemonic != "" {
+		decryptedWallet, err := wallet.DecryptWallet(walletData, req.Mnemonic)
+		if err != nil {
+			http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+			return
+		}
+
+		response := map[string]interface{}{
+			"success": true,
+			"wallet":  decryptedWallet,
+			"message": "Wallet loaded successfully",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		// Return encrypted wallet data for client-side decryption
+		response := map[string]interface{}{
+			"success":     true,
+			"wallet_data": string(walletData),
+			"message":     "Wallet file loaded, provide mnemonic to decrypt",
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
+		}
 	}
 }
 

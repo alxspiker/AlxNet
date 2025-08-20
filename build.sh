@@ -151,12 +151,12 @@ build_binaries() {
     log_info "Building binaries with security enhancements..."
     mkdir -p "$OUT_DIR"
     
-    # Build betanet (single unified command)
-    log_info "Building betanet..."
-    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/betanet" ./cmd/betanet; then
-        log_success "betanet built successfully"
+    # Build alxnet (single unified command)
+    log_info "Building alxnet..."
+    if GOOS=linux GOARCH=amd64 "$GO_BIN" build $SECURITY_FLAGS -o "$OUT_DIR/alxnet" ./cmd/alxnet; then
+        log_success "alxnet built successfully"
     else
-        log_error "Failed to build betanet!"
+        log_error "Failed to build alxnet!"
         exit 1
     fi
 }
@@ -165,7 +165,7 @@ build_binaries() {
 audit_binaries() {
     log_info "Auditing built binaries..."
     
-    for binary in betanet; do
+    for binary in alxnet; do
         if [ -f "$OUT_DIR/$binary" ]; then
             log_info "Auditing $binary..."
             
@@ -197,14 +197,14 @@ generate_report() {
     
     report_file="$OUT_DIR/build-report.txt"
     {
-        echo "Betanet Build Report"
+        echo "AlxNet Build Report"
         echo "===================="
         echo "Build Date: $(date)"
         echo "Go Version: $("$GO_BIN" version)"
         echo "Build Flags: $SECURITY_FLAGS"
         echo ""
         echo "Binaries Built:"
-        for binary in betanet; do
+        for binary in alxnet; do
             if [ -f "$OUT_DIR/$binary" ]; then
                 size=$(stat -c "%s" "$OUT_DIR/$binary")
                 echo "  $binary: $size bytes"
@@ -226,7 +226,7 @@ generate_report() {
 
 # Main build process
 main() {
-    log_info "Starting enhanced Betanet build process..."
+    log_info "Starting enhanced AlxNet build process..."
     log_info "Using Go: $GO_BIN"
     
     # Check prerequisites

@@ -1,4 +1,4 @@
-module betanet
+module alxnet
 
 go 1.23.0
 
