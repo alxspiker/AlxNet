@@ -4,6 +4,10 @@
 
 Decentralized multi‑file website publishing & browsing in one self‑contained Go binary.
 
+Fully working and tested locally, not yet tested across the internet.
+
+A master node list will be updated when the project is ready for launch to bootstrap the network.
+
 [![Go Version](https://img.shields.io/badge/Go-1.23%2B-00ADD8?logo=go)](go.mod)
 [![Security Audit](https://img.shields.io/badge/Security-Automated-red)](./security-audit.sh)
 [![Tests](https://img.shields.io/badge/Tests-go%20test%20./...-brightgreen)](#tests)
