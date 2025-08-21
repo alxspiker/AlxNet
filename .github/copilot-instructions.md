@@ -150,3 +150,18 @@ Always reference these instructions first and fallback to search or bash command
 - **Memory usage:** Scales with content storage and peer connections
 - **Security features:** Position-independent executables, input validation, rate limiting
 - **Network limits:** Configurable via environment variables (ALXNET_MAX_PEERS, ALXNET_MAX_CONTENT_SIZE)
+
+### Environment Variables (ALXNET_*)
+Only the ALXNET_* prefix is supported (no legacy prefixes). All are optional; defaults come from compiled defaults in `internal/config/config.go`.
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| `ALXNET_ENV` | Runtime environment (`development`, `staging`, `production`) | `ALXNET_ENV=production` |
+| `ALXNET_LOG_LEVEL` | Log verbosity (`debug`,`info`,`warn`,`error`) | `ALXNET_LOG_LEVEL=debug` |
+| `ALXNET_LISTEN_ADDR` | libp2p listen multiaddr | `ALXNET_LISTEN_ADDR=/ip4/0.0.0.0/tcp/4001` |
+| `ALXNET_BOOTSTRAP_PEERS` | Comma-separated libp2p multiaddrs | `ALXNET_BOOTSTRAP_PEERS=/ip4/1.2.3.4/tcp/4001/p2p/12D3..,/dns4/node.example/tcp/4001/p2p/12D3..` |
+| `ALXNET_MAX_PEERS` | Max peer connections (int) | `ALXNET_MAX_PEERS=150` |
+| `ALXNET_MAX_CONTENT_SIZE` | Max single content size bytes (int64) | `ALXNET_MAX_CONTENT_SIZE=20971520` |
+| `ALXNET_DATA_DIR` | Data directory path | `ALXNET_DATA_DIR=/var/lib/alxnet` |
+
+Unset variables fall back to the defaults documented in this file. Adjusting these requires restart.
