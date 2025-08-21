@@ -292,7 +292,7 @@ Security concerns: open a private issue if sensitive.
 ---
 
 ## 📄 License
-MIT (see `LICENSE` if present). If no license file yet, add MIT or desired license before redistribution.
+MIT (see `LICENSE`).
 
 ---
 
