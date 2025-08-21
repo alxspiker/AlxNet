@@ -493,35 +493,12 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                     'Wallet created successfully!\\n\\n' +
                     'IMPORTANT: Save this mnemonic phrase safely:\\n' +
                     result.mnemonic + '\\n\\n' +
-                    'Wallet automatically saved and downloaded.'
+                    'Wallet automatically saved to: ' + result.saved_path
                 );
                 
                 updateStatus();
                 
-                // Auto-save wallet with timestamp
-                const timestamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
-                const walletName = 'wallet_' + timestamp;
-                
-                try {
-                    await apiCall('/api/wallet/save', 'POST', {
-                        wallet_data: JSON.stringify(result.wallet),
-                        name: walletName
-                    });
-                } catch (saveError) {
-                    console.warn('Auto-save failed:', saveError);
-                }
-                
-                // Create download link
-                const walletData = JSON.stringify(result.wallet, null, 2);
-                const blob = new Blob([walletData], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'alxnet-wallet.json';
-                a.click();
-                URL.revokeObjectURL(url);
-                
-                // Refresh wallet list
+                // Refresh wallet list to show the new wallet
                 loadWalletList();
                 
             } catch (error) {
@@ -909,12 +886,32 @@ func (ws *WebServer) handleCreateWallet(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Generate wallet filename with timestamp
+	timestamp := time.Now().Format("2006-01-02_15-04")
+	walletName := fmt.Sprintf("wallet_%s", timestamp)
+	
+	// Get data directory and ensure wallets directory exists
+	dataDir := ws.store.GetDataDir()
+	walletsDir := filepath.Join(dataDir, "wallets")
+	if err := os.MkdirAll(walletsDir, 0755); err != nil {
+		http.Error(w, "Failed to create wallets directory", http.StatusInternalServerError)
+		return
+	}
+
+	// Save encrypted wallet to data/wallets directory
+	walletPath := filepath.Join(walletsDir, walletName+".wallet")
+	if err := os.WriteFile(walletPath, encryptedWallet, 0600); err != nil {
+		http.Error(w, "Failed to save wallet file", http.StatusInternalServerError)
+		return
+	}
+
 	response := map[string]interface{}{
-		"success":      true,
-		"mnemonic":     mnemonic,
-		"wallet":       walletData,
-		"encrypted":    base64.StdEncoding.EncodeToString(encryptedWallet),
-		"download_url": "/api/wallet/download", // TODO: implement download endpoint
+		"success":     true,
+		"mnemonic":    mnemonic,
+		"wallet":      walletData,
+		"wallet_name": walletName,
+		"saved_path":  walletPath,
+		"message":     fmt.Sprintf("Wallet '%s' created and saved to %s", walletName, walletPath),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
