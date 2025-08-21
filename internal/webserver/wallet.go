@@ -889,7 +889,7 @@ func (ws *WebServer) handleCreateWallet(w http.ResponseWriter, r *http.Request) 
 	// Generate wallet filename with timestamp
 	timestamp := time.Now().Format("2006-01-02_15-04")
 	walletName := fmt.Sprintf("wallet_%s", timestamp)
-	
+
 	// Get data directory and ensure wallets directory exists
 	dataDir := ws.store.GetDataDir()
 	walletsDir := filepath.Join(dataDir, "wallets")
