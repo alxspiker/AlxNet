@@ -527,6 +527,94 @@ func (s *Store) SetHead(siteID string, seq uint64, headCID string) error {
 	return s.PutHead(siteID, seq, headCID)
 }
 
+// ListSites lists all site IDs that have stored data
+func (s *Store) ListSites() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var sites []string
+	siteMap := make(map[string]bool)
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Look for site manifest keys (site:<siteID>:manifest)
+		prefix := []byte("site:")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			key := string(it.Item().Key())
+			// Parse key: site:<siteID>:manifest or site:<siteID>:file:...
+			parts := strings.Split(key, ":")
+			if len(parts) >= 3 && parts[0] == "site" {
+				siteID := parts[1]
+				if !siteMap[siteID] {
+					sites = append(sites, siteID)
+					siteMap[siteID] = true
+				}
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sites: %w", err)
+	}
+
+	return sites, nil
+}
+
+// GetStorageUsage calculates the total storage usage across all content
+func (s *Store) GetStorageUsage() (int64, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var totalBytes int64
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Count bytes for content: keys
+		prefix := []byte("content:")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			totalBytes += int64(it.Item().ValueSize())
+		}
+
+		return nil
+	})
+
+	return totalBytes, err
+}
+
+// GetContentFileCount counts the total number of content files
+func (s *Store) GetContentFileCount() (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var count int
+
+	err := s.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchSize = 10
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Count content: keys
+		prefix := []byte("content:")
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			count++
+		}
+
+		return nil
+	})
+
+	return count, err
+}
+
 // ResolveContentCID resolves a CID prefix to the full content CID, ensuring uniqueness.
 func (s *Store) ResolveContentCID(prefix string) (string, error) {
 	var found string
@@ -566,7 +654,61 @@ func (s *Store) ResolveContentCID(prefix string) (string, error) {
 
 // Domain resolution methods
 
+// validateDomainName validates domain name format according to requirements:
+// - alphanumeric lowercase only
+// - starts with letter or number
+// - can contain underscores and dashes
+// - minimum 3 characters, maximum 32 characters
+func (s *Store) validateDomainName(domain string) error {
+	if len(domain) < 3 {
+		return fmt.Errorf("domain name must be at least 3 characters long")
+	}
+	if len(domain) > 32 {
+		return fmt.Errorf("domain name must be at most 32 characters long")
+	}
+
+	// Check first character
+	firstChar := domain[0]
+	if !((firstChar >= 'a' && firstChar <= 'z') || (firstChar >= '0' && firstChar <= '9')) {
+		return fmt.Errorf("domain name must start with a letter or number")
+	}
+
+	// Check all characters
+	for i, char := range domain {
+		if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') || char == '_' || char == '-') {
+			return fmt.Errorf("domain name can only contain lowercase letters, numbers, underscores, and dashes")
+		}
+
+		// No consecutive special characters
+		if i > 0 && (char == '_' || char == '-') {
+			prevChar := rune(domain[i-1])
+			if prevChar == '_' || prevChar == '-' {
+				return fmt.Errorf("domain name cannot have consecutive underscores or dashes")
+			}
+		}
+	}
+
+	// Cannot end with underscore or dash
+	lastChar := domain[len(domain)-1]
+	if lastChar == '_' || lastChar == '-' {
+		return fmt.Errorf("domain name cannot end with underscore or dash")
+	}
+
+	return nil
+}
+
 func (s *Store) PutDomain(domain string, siteID string) error {
+	// Validate domain name
+	if err := s.validateDomainName(domain); err != nil {
+		return fmt.Errorf("invalid domain name: %w", err)
+	}
+
+	// Check if domain already exists
+	existingSiteID, err := s.GetDomain(domain)
+	if err == nil && existingSiteID != siteID {
+		return fmt.Errorf("domain '%s' is already registered to another site", domain)
+	}
+
 	return s.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte("domain:"+domain), []byte(siteID))
 	})
@@ -626,6 +768,53 @@ func (s *Store) TransferDomain(domain string, newOwnerPub []byte, signature []by
 	// TODO: Implement domain transfer with cryptographic proof
 	// For now, just return an error
 	return errors.New("domain transfer not yet implemented")
+}
+
+// ValidateSiteName validates a site name according to the rules:
+// - alphanumeric characters only (lowercase)
+// - can contain underscores and dashes
+// - must start with letter or number
+// - length between 3 and 32 characters
+func (s *Store) ValidateSiteName(siteName string) error {
+	if len(siteName) < 3 || len(siteName) > 32 {
+		return errors.New("site name must be between 3 and 32 characters")
+	}
+
+	// Check first character is alphanumeric
+	if !((siteName[0] >= 'a' && siteName[0] <= 'z') || (siteName[0] >= '0' && siteName[0] <= '9')) {
+		return errors.New("site name must start with a letter or number")
+	}
+
+	// Check all characters are valid
+	for _, r := range siteName {
+		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' || r == '-') {
+			return errors.New("site name can only contain lowercase letters, numbers, underscores, and dashes")
+		}
+	}
+
+	return nil
+}
+
+// RegisterSiteName registers a site name for a site ID with conflict resolution
+// Returns error if validation fails or if the name is already taken
+func (s *Store) RegisterSiteName(siteName string, siteID string) error {
+	// Validate site name format
+	if err := s.ValidateSiteName(siteName); err != nil {
+		return err
+	}
+
+	// Check if site name is already taken
+	existingSiteID, err := s.GetDomain(siteName)
+	if err == nil && existingSiteID != "" {
+		if existingSiteID == siteID {
+			// Same site trying to register again - that's ok
+			return nil
+		}
+		return fmt.Errorf("site name '%s' is already registered to another site", siteName)
+	}
+
+	// Register the site name
+	return s.PutDomain(siteName, siteID)
 }
 
 // Validation methods

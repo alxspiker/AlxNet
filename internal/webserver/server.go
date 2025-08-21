@@ -47,6 +47,9 @@ func NewBrowserServer(store *store.Store, node *p2p.Node, logger *zap.Logger, po
 	mux.HandleFunc("/api/sites", ws.handleAPISites)
 	mux.HandleFunc("/api/site/", ws.handleAPISite)
 	mux.HandleFunc("/api/browse/", ws.handleAPIBrowse)
+	mux.HandleFunc("/api/sitenames", ws.handleAPISiteNames)
+	mux.HandleFunc("/api/sitename/register", ws.handleAPISiteNameRegister)
+	mux.HandleFunc("/api/sitename/resolve/", ws.handleAPISiteNameResolve)
 	mux.HandleFunc("/_alxnet/status", ws.handleStatus)
 
 	ws.server = &http.Server{
@@ -82,9 +85,9 @@ func (ws *WebServer) Stop() error {
 	return ws.server.Shutdown(ctx)
 }
 
-// handleWebsite serves websites by site ID or domain
+// handleWebsite serves websites by site ID or site name
 func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
-	// Parse the URL to extract site ID and file path
+	// Parse the URL to extract site ID/name and file path
 	urlParts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 
 	if len(urlParts) == 0 || urlParts[0] == "" {
@@ -92,21 +95,38 @@ func (ws *WebServer) handleWebsite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	siteID := urlParts[0]
+	siteIDOrName := urlParts[0]
 	filePath := "index.html"
 
 	if len(urlParts) > 1 {
 		filePath = strings.Join(urlParts[1:], "/")
 	}
 
-	// Validate site ID format
-	if len(siteID) != 64 {
-		http.Error(w, "Invalid site ID format", http.StatusBadRequest)
-		return
+	var siteID string
+	var err error
+
+	// Check if it's a 64-character site ID or a site name
+	if len(siteIDOrName) == 64 {
+		// Validate as hex string
+		for _, r := range siteIDOrName {
+			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f')) {
+				http.Error(w, "Invalid site ID format", http.StatusBadRequest)
+				return
+			}
+		}
+		siteID = siteIDOrName
+	} else {
+		// Try to resolve as site name
+		siteID, err = ws.store.ResolveDomain(siteIDOrName)
+		if err != nil {
+			http.Error(w, "Site name not found", http.StatusNotFound)
+			return
+		}
 	}
 
 	ws.logger.Info("serving website content",
 		zap.String("site_id", siteID),
+		zap.String("site_name", siteIDOrName),
 		zap.String("file_path", filePath))
 
 	// Try to get the website content
@@ -329,9 +349,9 @@ func (ws *WebServer) serveAlxNetHomepage(w http.ResponseWriter, r *http.Request)
         
         <div class="search-box">
             <h2>Browse a Decentralized Website</h2>
-            <input type="text" id="siteInput" placeholder="Enter site ID (64 character hex string)" maxlength="64">
+            <input type="text" id="siteInput" placeholder="Enter site ID (64 characters) or site name" maxlength="64">
             <button onclick="browseSite()">Browse Site</button>
-            <p><small>Example: b36c5d32ed19dce14f8f1f279aeede1e2c2ab397e44e8b5d31f89c9320096b33</small></p>
+            <p><small>Examples: b36c5d32ed19dce14f8f1f279aeede1e2c2ab397e44e8b5d31f89c9320096b33 or mysite</small></p>
         </div>
         
         <div class="features">
@@ -358,7 +378,10 @@ func (ws *WebServer) serveAlxNetHomepage(w http.ResponseWriter, r *http.Request)
             <ul>
                 <li><code>/api/sites</code> - List all available sites</li>
                 <li><code>/api/site/{siteID}</code> - Get site information</li>
-                <li><code>/{siteID}/{filepath}</code> - Browse site content</li>
+                <li><code>/api/sitenames</code> - List all registered site names</li>
+                <li><code>/api/sitename/register</code> - Register a new site name</li>
+                <li><code>/api/sitename/resolve/{siteName}</code> - Resolve site name to ID</li>
+                <li><code>/{siteID or siteName}/{filepath}</code> - Browse site content</li>
                 <li><code>/_alxnet/status</code> - Server status</li>
             </ul>
         </div>
@@ -366,11 +389,23 @@ func (ws *WebServer) serveAlxNetHomepage(w http.ResponseWriter, r *http.Request)
     
     <script>
         function browseSite() {
-            const siteID = document.getElementById('siteInput').value.trim();
-            if (siteID.length === 64 && /^[a-fA-F0-9]+$/.test(siteID)) {
-                window.location.href = '/' + siteID;
-            } else {
-                alert('Please enter a valid 64-character hexadecimal site ID');
+            const input = document.getElementById('siteInput').value.trim();
+            
+            if (!input) {
+                alert('Please enter a site ID or site name');
+                return;
+            }
+            
+            // Check if it's a 64-character hex site ID
+            if (input.length === 64 && /^[a-fA-F0-9]+$/.test(input)) {
+                window.location.href = '/' + input;
+            } 
+            // Check if it's a valid site name format
+            else if (input.length >= 3 && input.length <= 32 && /^[a-z0-9][a-z0-9_-]*$/.test(input)) {
+                window.location.href = '/' + input;
+            } 
+            else {
+                alert('Please enter a valid site ID (64-character hex) or site name (3-32 chars, lowercase, alphanumeric, _, -)');
             }
         }
         
@@ -409,8 +444,11 @@ func (ws *WebServer) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 // handleAPISites lists all available sites
 func (ws *WebServer) handleAPISites(w http.ResponseWriter, r *http.Request) {
-	// This would need implementation to list all sites from the store
-	sites := []string{}
+	sites, err := ws.store.ListSites()
+	if err != nil {
+		http.Error(w, "Failed to list sites", http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(map[string]interface{}{
@@ -469,5 +507,93 @@ func (ws *WebServer) handleAPIBrowse(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewEncoder(w).Encode(result); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
+	}
+}
+
+// handleAPISiteNames lists all registered site names
+func (ws *WebServer) handleAPISiteNames(w http.ResponseWriter, r *http.Request) {
+	siteNames, err := ws.store.ListDomains()
+	if err != nil {
+		http.Error(w, "Failed to list site names", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"site_names": siteNames,
+		"count":      len(siteNames),
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+// handleAPISiteNameRegister registers a new site name
+func (ws *WebServer) handleAPISiteNameRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request struct {
+		SiteName string `json:"site_name"`
+		SiteID   string `json:"site_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	if request.SiteName == "" || request.SiteID == "" {
+		http.Error(w, "site_name and site_id are required", http.StatusBadRequest)
+		return
+	}
+
+	// Validate site ID format (64 character hex)
+	if len(request.SiteID) != 64 {
+		http.Error(w, "Invalid site ID format", http.StatusBadRequest)
+		return
+	}
+
+	// Register the site name
+	if err := ws.store.RegisterSiteName(request.SiteName, request.SiteID); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":   true,
+		"site_name": request.SiteName,
+		"site_id":   request.SiteID,
+		"message":   "Site name registered successfully",
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+	}
+}
+
+// handleAPISiteNameResolve resolves a site name to site ID
+func (ws *WebServer) handleAPISiteNameResolve(w http.ResponseWriter, r *http.Request) {
+	siteName := strings.TrimPrefix(r.URL.Path, "/api/sitename/resolve/")
+
+	if siteName == "" {
+		http.Error(w, "Site name is required", http.StatusBadRequest)
+		return
+	}
+
+	siteID, err := ws.store.ResolveDomain(siteName)
+	if err != nil {
+		http.Error(w, "Site name not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
+		"site_name": siteName,
+		"site_id":   siteID,
+		"url":       fmt.Sprintf("http://localhost:%d/%s", ws.port, siteName),
+	}); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 	}
 }

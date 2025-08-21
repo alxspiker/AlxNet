@@ -349,8 +349,24 @@ func (ws *WebServer) handleNodeHomepage(w http.ResponseWriter, r *http.Request) 
         }
         
         function formatTime(timestamp) {
-            if (!timestamp) return 'Unknown';
-            return new Date(timestamp * 1000).toLocaleString();
+            if (!timestamp || timestamp === 'Unknown') return 'Unknown';
+            
+            // Handle both Unix timestamp (number) and ISO string formats
+            let date;
+            if (typeof timestamp === 'number') {
+                date = new Date(timestamp * 1000);
+            } else if (typeof timestamp === 'string') {
+                date = new Date(timestamp);
+            } else {
+                return 'Unknown';
+            }
+            
+            // Check if date is valid
+            if (isNaN(date.getTime())) {
+                return 'Unknown';
+            }
+            
+            return date.toLocaleString();
         }
     </script>
 </body>
@@ -447,13 +463,31 @@ func (ws *WebServer) handleStorageStats(w http.ResponseWriter, r *http.Request) 
 		domainCount = len(domains)
 	}
 
-	// Basic storage stats - in a real implementation, these would be tracked
+	// Get site count
+	sites, err := ws.store.ListSites()
+	siteCount := 0
+	if err == nil {
+		siteCount = len(sites)
+	}
+
+	// Get storage usage
+	storageBytes, err := ws.store.GetStorageUsage()
+	if err != nil {
+		storageBytes = 0
+	}
+
+	// Get content file count
+	contentFiles, err := ws.store.GetContentFileCount()
+	if err != nil {
+		contentFiles = 0
+	}
+
 	stats := map[string]interface{}{
 		"success":       true,
-		"total_sites":   0, // Would need to implement site counting
+		"total_sites":   siteCount,
 		"total_domains": domainCount,
-		"storage_bytes": 0, // Would need to implement storage tracking
-		"content_files": 0, // Would need to implement file counting
+		"storage_bytes": storageBytes,
+		"content_files": contentFiles,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -464,9 +498,68 @@ func (ws *WebServer) handleStorageStats(w http.ResponseWriter, r *http.Request) 
 }
 
 func (ws *WebServer) handleStorageSites(w http.ResponseWriter, r *http.Request) {
-	// In a real implementation, this would query the store for all sites
-	sites := []map[string]interface{}{
-		// This would be populated from actual store data
+	siteIDs, err := ws.store.ListSites()
+	if err != nil {
+		response := map[string]interface{}{
+			"success": false,
+			"error":   "Failed to list sites",
+			"sites":   []map[string]interface{}{},
+			"count":   0,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Convert site IDs to detailed site information
+	sites := make([]map[string]interface{}, 0, len(siteIDs))
+	for _, siteID := range siteIDs {
+		siteInfo := map[string]interface{}{
+			"id": siteID,
+		}
+
+		// Try to get additional site information
+		if info, err := ws.store.GetWebsiteInfo(siteID); err == nil && info != nil {
+			siteInfo["main_file"] = info.MainFile
+			siteInfo["file_count"] = info.FileCount
+			siteInfo["files"] = info.Files
+
+			// Handle invalid timestamp gracefully
+			if info.LastUpdated.IsZero() || info.LastUpdated.Unix() <= 0 {
+				// Try to get timestamp from any file in the site
+				if len(info.Files) > 0 {
+					for _, fileInfo := range info.Files {
+						if !fileInfo.LastUpdated.IsZero() && fileInfo.LastUpdated.Unix() > 0 {
+							siteInfo["last_updated"] = fileInfo.LastUpdated
+							break
+						}
+					}
+				}
+				// If still no valid timestamp, use current time as fallback
+				if siteInfo["last_updated"] == nil {
+					siteInfo["last_updated"] = "Unknown"
+				}
+			} else {
+				siteInfo["last_updated"] = info.LastUpdated
+			}
+		} else {
+			// If we can't get website info, set reasonable defaults
+			siteInfo["main_file"] = "index.html"
+			siteInfo["file_count"] = 1
+			siteInfo["last_updated"] = "Unknown"
+		}
+
+		// Get head information
+		if hasHead, _ := ws.store.HasHead(siteID); hasHead {
+			if seq, headCID, err := ws.store.GetHead(siteID); err == nil {
+				siteInfo["sequence"] = seq
+				siteInfo["head_cid"] = headCID
+			}
+		}
+
+		sites = append(sites, siteInfo)
 	}
 
 	response := map[string]interface{}{

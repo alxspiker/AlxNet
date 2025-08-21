@@ -44,6 +44,7 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	mux.HandleFunc("/api/wallet/load-file", ws.handleLoadWalletFile)
 	mux.HandleFunc("/api/wallet/list", ws.handleListWallets)
 	mux.HandleFunc("/api/wallet/save", ws.handleSaveWallet)
+	mux.HandleFunc("/api/wallet/encrypt", ws.handleEncryptWallet)
 	mux.HandleFunc("/api/wallet/sites", ws.handleWalletSites)
 	mux.HandleFunc("/api/wallet/add-site", ws.handleAddSite)
 	mux.HandleFunc("/api/site/files", ws.handleGetSiteFiles)
@@ -55,6 +56,7 @@ func NewWalletServer(store *store.Store, node *p2p.Node, logger *zap.Logger, por
 	mux.HandleFunc("/api/wallet/export-key", ws.handleExportKey)
 	mux.HandleFunc("/api/domains/register", ws.handleRegisterDomain)
 	mux.HandleFunc("/api/domains/list", ws.handleListDomains)
+	mux.HandleFunc("/api/domains/list-wallet", ws.handleListWalletDomains)
 	mux.HandleFunc("/api/domains/resolve", ws.handleResolveDomain)
 	mux.HandleFunc("/api/websites/info", ws.handleGetWebsiteInfo)
 	mux.HandleFunc("/api/status", ws.handleWalletStatus)
@@ -292,6 +294,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         <div class="nav">
             <button id="nav-wallet" class="active" onclick="showScreen('wallet')">Wallet</button>
             <button id="nav-sites" onclick="showScreen('sites')" disabled>Sites</button>
+            <button id="nav-domains" onclick="showScreen('domains')" disabled>Site Names</button>
             <button id="nav-editor" onclick="showScreen('editor')" disabled>Editor</button>
         </div>
         
@@ -326,10 +329,6 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                         <input type="file" id="walletFile" accept=".json">
                     </div>
                     <div class="form-group">
-                        <label>Mnemonic Phrase:</label>
-                        <input type="password" id="mnemonic" placeholder="Enter your mnemonic phrase">
-                    </div>
-                    <div class="form-group">
                         <button onclick="loadWallet()">Load Wallet File</button>
                     </div>
                 </div>
@@ -357,9 +356,57 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                     </div>
                     <div class="form-group">
                         <button onclick="createSite()">Create New Site</button>
-                        <button onclick="selectSite()" class="secondary" id="select-site-btn" disabled>Select Site</button>
                     </div>
                     <div id="site-result" class="status hidden"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Site Names Management Screen -->
+        <div id="screen-domains" class="screen">
+            <h2>Site Names Management</h2>
+            <div class="grid-2">
+                <div>
+                    <h3>Your Site Names</h3>
+                    <div id="domains-list" class="list">
+                        <div class="text-center" style="padding: 2rem;">
+                            <p>No site names registered yet.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h3>Register New Site Name</h3>
+                    <div class="form-group">
+                        <label>Site Name:</label>
+                        <input type="text" id="new-domain-name" placeholder="mysite" 
+                               style="text-transform: lowercase;" 
+                               onkeypress="return validateDomainInput(event)"
+                               oninput="this.value = this.value.toLowerCase(); validateDomainName()">
+                        <small style="opacity: 0.8; font-size: 0.85rem;">
+                            3-32 characters, letters/numbers only, can include _ and -, cannot start/end with _ or -
+                        </small>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Site:</label>
+                        <select id="domain-site-select">
+                            <option value="">Choose a site...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button onclick="registerDomain()" id="register-domain-btn" disabled>Register Site Name</button>
+                    </div>
+                    <div id="domain-result" class="status hidden"></div>
+                    
+                    <div style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.2);">
+                        <h4>How to Use Site Names</h4>
+                        <p style="font-size: 0.9rem; opacity: 0.9; line-height: 1.5;">
+                            Once registered, your site name can be used instead of the site ID:<br>
+                            • Access directly: <code>http://localhost:8080/yourname</code><br>
+                            • API resolve: <code>/api/domains/resolve?domain=yourname</code><br>
+                            • Site names are unique and cannot be changed once registered.
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -403,6 +450,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         // Global state
         let currentWallet = null;
         let currentMnemonic = null;
+        let currentWalletName = null;
         let currentSite = null;
         let siteFiles = {};
         let selectedFile = null;
@@ -426,6 +474,9 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             // Load screen data
             if (screenName === 'sites' && currentWallet) {
                 loadSites();
+            } else if (screenName === 'domains' && currentWallet) {
+                loadDomains();
+                loadSitesForDomains();
             } else if (screenName === 'editor' && currentSite) {
                 loadSiteFiles();
             }
@@ -448,13 +499,15 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             
             // Enable/disable navigation
             document.getElementById('nav-sites').disabled = !currentWallet;
+            document.getElementById('nav-domains').disabled = !currentSite;
             document.getElementById('nav-editor').disabled = !currentSite;
         }
         
         // Utility functions
         function showResult(elementId, content, type = 'success') {
             const element = document.getElementById(elementId);
-            element.textContent = content;
+            // Convert newlines to HTML breaks for proper display
+            element.innerHTML = content.replace(/\n/g, '<br>');
             element.className = 'status ' + type;
             element.classList.remove('hidden');
         }
@@ -482,6 +535,33 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             }
         }
         
+        // Helper function to save wallet to file after updates
+        async function saveWalletToFile() {
+            if (!currentWallet || !currentMnemonic || !currentWalletName) {
+                console.warn('Cannot save wallet: missing wallet data or name');
+                return;
+            }
+            
+            try {
+                // Re-encrypt the wallet with the current mnemonic
+                const encryptedWallet = await apiCall('/api/wallet/encrypt', 'POST', {
+                    wallet_data: currentWallet,
+                    mnemonic: currentMnemonic
+                });
+                
+                // Save the encrypted wallet to file
+                await apiCall('/api/wallet/save', 'POST', {
+                    wallet_data: encryptedWallet.encrypted_wallet,
+                    name: currentWalletName
+                });
+                
+                console.log('Wallet saved successfully');
+            } catch (error) {
+                console.error('Failed to save wallet:', error.message);
+                // Don't throw - this is a background operation
+            }
+        }
+        
         // Wallet functions
         async function createWallet() {
             try {
@@ -490,9 +570,9 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 currentMnemonic = result.mnemonic;
                 
                 showResult('wallet-result', 
-                    'Wallet created successfully!\\n\\n' +
-                    'IMPORTANT: Save this mnemonic phrase safely:\\n' +
-                    result.mnemonic + '\\n\\n' +
+                    'Wallet created successfully!\n\n' +
+                    'IMPORTANT: Save this mnemonic phrase safely:\n' +
+                    result.mnemonic + '\n\n' +
                     'Wallet automatically saved to: ' + result.saved_path
                 );
                 
@@ -508,10 +588,15 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         
         async function loadWallet() {
             const fileInput = document.getElementById('walletFile');
-            const mnemonicInput = document.getElementById('mnemonic');
             
-            if (!fileInput.files[0] || !mnemonicInput.value) {
-                showResult('wallet-result', 'Please select a wallet file and enter mnemonic', 'error');
+            if (!fileInput.files[0]) {
+                showResult('wallet-result', 'Please select a wallet file', 'error');
+                return;
+            }
+            
+            const mnemonic = prompt('Enter your mnemonic phrase:');
+            if (!mnemonic) {
+                showResult('wallet-result', 'Mnemonic phrase is required', 'error');
                 return;
             }
             
@@ -519,14 +604,14 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 const walletData = await fileInput.files[0].text();
                 const result = await apiCall('/api/wallet/load', 'POST', {
                     wallet_data: walletData,
-                    mnemonic: mnemonicInput.value
+                    mnemonic: mnemonic
                 });
                 
                 currentWallet = result.wallet;
-                currentMnemonic = mnemonicInput.value;
+                currentMnemonic = mnemonic;
                 
                 showResult('wallet-result', 
-                    'Wallet loaded successfully!\\nSites found: ' + result.sites.length
+                    'Wallet loaded successfully!\nSites found: ' + result.sites.length
                 );
                 
                 updateStatus();
@@ -558,29 +643,31 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
         // Load wallet from saved file
         async function loadSavedWallet() {
             const walletSelect = document.getElementById('saved-wallets');
-            const mnemonicInput = document.getElementById('mnemonic');
             
             if (!walletSelect.value) {
                 showResult('wallet-result', 'Please select a wallet', 'error');
                 return;
             }
             
-            if (!mnemonicInput.value) {
-                showResult('wallet-result', 'Please enter your mnemonic phrase', 'error');
+            const mnemonic = prompt('Enter your mnemonic phrase:');
+            if (!mnemonic) {
+                showResult('wallet-result', 'Mnemonic phrase is required', 'error');
                 return;
             }
             
             try {
                 const result = await apiCall('/api/wallet/load-file', 'POST', {
                     filename: walletSelect.value,
-                    mnemonic: mnemonicInput.value
+                    mnemonic: mnemonic
                 });
                 
                 currentWallet = result.wallet;
-                currentMnemonic = mnemonicInput.value;
+                currentMnemonic = mnemonic;
+                // Extract wallet name from filename (remove .wallet extension)
+                currentWalletName = walletSelect.value.replace('.wallet', '');
                 
                 showResult('wallet-result', 
-                    'Wallet loaded successfully from saved file!\\n' +
+                    'Wallet loaded successfully from saved file!\n' +
                     'Sites found: ' + Object.keys(result.wallet.sites || {}).length
                 );
                 
@@ -606,7 +693,7 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                     sitesList.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No sites found. Create your first site!</p></div>';
                 } else {
                     sitesList.innerHTML = result.sites.map(site => 
-                        '<div class="list-item" onclick="selectSiteFromList(\'' + site.label + '\')" data-label="' + site.label + '">' +
+                        '<div class="list-item" onclick="selectSite(\'' + site.label + '\')" data-label="' + site.label + '">' +
                             '<strong>' + site.label + '</strong><br>' +
                             '<small>ID: ' + site.site_id + '</small><br>' +
                             '<small>Updated: ' + new Date(site.last_updated).toLocaleString() + '</small>' +
@@ -618,20 +705,6 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
             }
         }
         
-        function selectSiteFromList(label) {
-            // Remove previous selection
-            document.querySelectorAll('#sites-list .list-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-            
-            // Select current item
-            document.querySelector('#sites-list .list-item[data-label="' + label + '"]').classList.add('selected');
-            
-            // Enable select button
-            document.getElementById('select-site-btn').disabled = false;
-            document.getElementById('select-site-btn').onclick = () => selectSite(label);
-        }
-        
         function selectSite(label) {
             if (!label) {
                 const selected = document.querySelector('#sites-list .list-item.selected');
@@ -641,6 +714,12 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 }
                 label = selected.dataset.label;
             }
+            
+            // Remove previous selection and highlight current site
+            document.querySelectorAll('#sites-list .list-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector('#sites-list .list-item[data-label="' + label + '"]').classList.add('selected');
             
             currentSite = currentWallet.sites[label];
             if (!currentSite) {
@@ -673,6 +752,10 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 });
                 
                 currentWallet = result.wallet;
+                
+                // Save the updated wallet to file
+                await saveWalletToFile();
+                
                 showResult('site-result', 'Site "' + label + '" created successfully!');
                 document.getElementById('new-site-label').value = '';
                 loadSites();
@@ -853,6 +936,187 @@ func (ws *WebServer) handleWalletHomepage(w http.ResponseWriter, r *http.Request
                 showResult('editor-result', 'Error publishing site: ' + error.message, 'error');
             }
         }
+
+        // Domain Management Functions
+        function validateDomainInput(event) {
+            const char = event.key;
+            const input = event.target;
+            const value = input.value + char;
+            
+            // Allow backspace, delete, etc
+            if (event.keyCode < 32) return true;
+            
+            // Only allow letters, numbers, underscore, dash
+            if (!/[a-z0-9_-]/.test(char)) {
+                event.preventDefault();
+                return false;
+            }
+            
+            // First character must be letter or number
+            if (input.value.length === 0 && !/[a-z0-9]/.test(char)) {
+                event.preventDefault();
+                return false;
+            }
+            
+            return true;
+        }
+
+        function validateDomainName() {
+            const input = document.getElementById('new-domain-name');
+            const button = document.getElementById('register-domain-btn');
+            const value = input.value;
+            
+            let isValid = false;
+            
+            if (value.length >= 3 && value.length <= 32) {
+                // Check format
+                if (/^[a-z0-9][a-z0-9_-]*[a-z0-9]$|^[a-z0-9]$/.test(value)) {
+                    // Check no consecutive special chars
+                    if (!/[_-]{2,}/.test(value)) {
+                        isValid = true;
+                    }
+                }
+            }
+            
+            button.disabled = !isValid || !document.getElementById('domain-site-select').value;
+            
+            if (value.length > 0 && !isValid) {
+                input.style.borderColor = '#ff6b6b';
+            } else {
+                input.style.borderColor = '';
+            }
+        }
+
+        async function loadDomains() {
+            try {
+                if (!currentWallet || !currentWallet.sites) {
+                    const domainsList = document.getElementById('domains-list');
+                    domainsList.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No wallet loaded.</p></div>';
+                    return;
+                }
+
+                // Get all site IDs from the current wallet
+                const siteIds = Object.values(currentWallet.sites).map(site => site.site_id);
+                
+                const response = await fetch('/api/domains/list-wallet', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        site_ids: siteIds
+                    })
+                });
+                
+                const data = await response.json();
+                
+                const domainsList = document.getElementById('domains-list');
+                
+                if (data.success && data.count > 0) {
+                    domainsList.innerHTML = Object.entries(data.domains).map(([domain, siteId]) => 
+                        '<div class="list-item">' +
+                            '<div><strong>' + domain + '</strong></div>' +
+                            '<div style="font-size: 0.85rem; opacity: 0.8;">Site: ' + siteId.substring(0, 16) + '...</div>' +
+                        '</div>'
+                    ).join('');
+                } else {
+                    domainsList.innerHTML = '<div class="text-center" style="padding: 2rem;"><p>No site names registered yet.</p></div>';
+                }
+            } catch (error) {
+                showResult('domain-result', 'Error loading domains: ' + error.message, 'error');
+            }
+        }
+
+        async function loadSitesForDomains() {
+            const select = document.getElementById('domain-site-select');
+            select.innerHTML = '<option value="">Choose a site...</option>';
+            
+            if (!currentWallet) return;
+            
+            try {
+                const response = await fetch('/api/wallet/sites', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wallet_data: JSON.stringify(currentWallet),
+                        mnemonic: currentMnemonic
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.sites) {
+                    data.sites.forEach(site => {
+                        const option = document.createElement('option');
+                        option.value = site.label;
+                        option.textContent = site.label + ' (' + site.site_id.substring(0, 16) + '...)';
+                        select.appendChild(option);
+                    });
+                }
+                
+                // Update button state
+                validateDomainName();
+                
+            } catch (error) {
+                showResult('domain-result', 'Error loading sites: ' + error.message, 'error');
+            }
+        }
+
+        async function registerDomain() {
+            const domainName = document.getElementById('new-domain-name').value;
+            const siteLabel = document.getElementById('domain-site-select').value;
+            
+            if (!domainName || !siteLabel || !currentWallet) {
+                showResult('domain-result', 'Please fill in all fields', 'error');
+                return;
+            }
+            
+            // Find the site ID for the selected label
+            const site = currentWallet.sites[siteLabel];
+            if (!site) {
+                showResult('domain-result', 'Selected site not found', 'error');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/domains/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        domain: domainName,
+                        site_id: site.site_id
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('domain-result', 
+                        'Site name "' + domainName + '" registered successfully!\\n' +
+                        'You can now access your site at: http://localhost:8080/' + domainName, 
+                        'success'
+                    );
+                    
+                    // Clear form
+                    document.getElementById('new-domain-name').value = '';
+                    document.getElementById('domain-site-select').value = '';
+                    document.getElementById('register-domain-btn').disabled = true;
+                    
+                    // Reload domains list
+                    loadDomains();
+                } else {
+                    throw new Error(data.error || 'Registration failed');
+                }
+                
+            } catch (error) {
+                showResult('domain-result', 'Error registering site name: ' + error.message, 'error');
+            }
+        }
+
+        // Update navigation enable/disable logic
+        function enableNavigation() {
+            document.getElementById('nav-sites').disabled = false;
+            document.getElementById('nav-domains').disabled = false;
+            document.getElementById('nav-editor').disabled = false;
+        }
     </script>
 </body>
 </html>\`
@@ -941,7 +1205,14 @@ func (ws *WebServer) handleLoadWallet(w http.ResponseWriter, r *http.Request) {
 	encryptedWallet := []byte(req.WalletData)
 	walletData, err := wallet.DecryptWallet(encryptedWallet, req.Mnemonic)
 	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -1094,7 +1365,14 @@ func (ws *WebServer) handlePublishContent(w http.ResponseWriter, r *http.Request
 	// Decrypt wallet
 	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
 	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -1306,7 +1584,14 @@ func (ws *WebServer) handleExportKey(w http.ResponseWriter, r *http.Request) {
 	// Decrypt wallet
 	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
 	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -1340,59 +1625,73 @@ func (ws *WebServer) handleExportKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ws *WebServer) handleRegisterDomain(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
 	if r.Method != "POST" {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Method not allowed",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	var req struct {
-		WalletData string `json:"wallet_data"`
-		Mnemonic   string `json:"mnemonic"`
-		Domain     string `json:"domain"`
-		Label      string `json:"label"`
+		Domain string `json:"domain"`
+		SiteID string `json:"site_id"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid request", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
-	// Decrypt wallet
-	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
-	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
-		return
-	}
-
-	// Generate master key
-	master, err := wallet.MasterKeyFromMnemonic(req.Mnemonic)
-	if err != nil {
-		http.Error(w, "Failed to generate master key", http.StatusInternalServerError)
-		return
-	}
-
-	// Ensure site exists
-	meta, _, _, err := walletData.EnsureSite(master, req.Label)
-	if err != nil {
-		http.Error(w, "Failed to get site", http.StatusInternalServerError)
+	// Validate domain format - use simple validation here
+	if len(req.Domain) < 3 || len(req.Domain) > 32 {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Domain name must be 3-32 characters",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	// Register domain
-	if err := ws.store.PutDomain(req.Domain, meta.SiteID); err != nil {
-		http.Error(w, "Failed to register domain", http.StatusInternalServerError)
+	if err := ws.store.PutDomain(req.Domain, req.SiteID); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to register domain",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
 	response := map[string]interface{}{
 		"success": true,
 		"domain":  req.Domain,
-		"site_id": meta.SiteID,
+		"site_id": req.SiteID,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
-		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to encode response",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 }
@@ -1413,6 +1712,78 @@ func (ws *WebServer) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
+}
+
+func (ws *WebServer) handleListWalletDomains(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Method not allowed",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	var req struct {
+		SiteIDs []string `json:"site_ids"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Get all domains
+	allDomains, err := ws.store.ListDomains()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to list domains",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Filter domains that belong to the provided site IDs
+	walletDomains := make(map[string]string)
+	for domain, siteID := range allDomains {
+		// Check if this siteID is in the provided list
+		for _, walletSiteID := range req.SiteIDs {
+			if siteID == walletSiteID {
+				walletDomains[domain] = siteID
+				break
+			}
+		}
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"domains": walletDomains,
+		"count":   len(walletDomains),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to encode response",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 }
@@ -1458,7 +1829,14 @@ func (ws *WebServer) handleGetWebsiteInfo(w http.ResponseWriter, r *http.Request
 	// Decrypt wallet
 	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
 	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -1649,6 +2027,91 @@ func (ws *WebServer) handleSaveWallet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (ws *WebServer) handleEncryptWallet(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Method not allowed",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	var req struct {
+		WalletData interface{} `json:"wallet_data"`
+		Mnemonic   string      `json:"mnemonic"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid request",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Convert wallet data to proper format
+	walletJSON, err := json.Marshal(req.WalletData)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Invalid wallet data format",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	var walletData wallet.Wallet
+	if err := json.Unmarshal(walletJSON, &walletData); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to parse wallet data",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	// Encrypt wallet
+	encryptedWallet, err := wallet.EncryptWallet(&walletData, req.Mnemonic)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to encrypt wallet",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := map[string]interface{}{
+		"success":          true,
+		"encrypted_wallet": string(encryptedWallet),
+	}
+
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Failed to encode response",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
+		return
+	}
+}
+
 func (ws *WebServer) handleLoadWalletFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "POST" {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -1696,7 +2159,14 @@ func (ws *WebServer) handleLoadWalletFile(w http.ResponseWriter, r *http.Request
 	if req.Mnemonic != "" {
 		decryptedWallet, err := wallet.DecryptWallet(walletData, req.Mnemonic)
 		if err != nil {
-			http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+			w.WriteHeader(http.StatusUnauthorized)
+			w.Header().Set("Content-Type", "application/json")
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+			}); err != nil {
+				http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			}
 			return
 		}
 
@@ -1903,7 +2373,14 @@ func (ws *WebServer) handleDeleteFileFromSite(w http.ResponseWriter, r *http.Req
 	// Decrypt wallet
 	walletData, err := wallet.DecryptWallet([]byte(req.WalletData), req.Mnemonic)
 	if err != nil {
-		http.Error(w, "Failed to decrypt wallet", http.StatusUnauthorized)
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"error":   "Incorrect mnemonic phrase. Please check your mnemonic and try again.",
+		}); err != nil {
+			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		}
 		return
 	}
 
