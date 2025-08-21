@@ -77,7 +77,7 @@ Always reference these instructions first and fallback to search or bash command
 
 ### CI/CD Validation
 - GitHub Actions automatically test network discovery and master node functionality
-- CI builds and tests run on Go 1.21+ with comprehensive network testing
+- CI builds and tests run on Go 1.23+ with comprehensive network testing
 - ALWAYS run `./build.sh` locally before pushing to ensure CI will pass.
 
 ## Build Timing Expectations
