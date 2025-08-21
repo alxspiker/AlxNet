@@ -266,7 +266,8 @@ log_info "Checking configuration validation..."
     grep -r "SecurityConfig\|MaxContentSize\|RateLimit" ./internal/config/ --include="*.go"
     echo ""
     echo "### Environment Variable Security"
-    grep -r "BETANET_" ./internal/config/ --include="*.go"
+    # Check for ALXNET_ environment variable usage
+    grep -r "ALXNET_" ./internal/config/ --include="*.go"
 } > "$REPORT_DIR/config-security.txt"
 
 echo "✅ **Configuration Security**: Analysis completed, see config-security.txt for details" >> "$REPORT_FILE"

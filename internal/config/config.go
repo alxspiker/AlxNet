@@ -169,37 +169,31 @@ func LoadFromFile(path string) (*Config, error) {
 func LoadFromEnvironment() *Config {
 	config := DefaultConfig()
 
-	// Override with environment variables
-	if env := os.Getenv("BETANET_ENV"); env != "" {
-		config.Environment = env
+	// Override with ALXNET_* environment variables (no legacy prefixes)
+	if v := os.Getenv("ALXNET_ENV"); v != "" {
+		config.Environment = v
 	}
-
-	if level := os.Getenv("BETANET_LOG_LEVEL"); level != "" {
-		config.LogLevel = level
+	if v := os.Getenv("ALXNET_LOG_LEVEL"); v != "" {
+		config.LogLevel = v
 	}
-
-	if addr := os.Getenv("BETANET_LISTEN_ADDR"); addr != "" {
-		config.Network.ListenAddr = addr
+	if v := os.Getenv("ALXNET_LISTEN_ADDR"); v != "" {
+		config.Network.ListenAddr = v
 	}
-
-	if peers := os.Getenv("BETANET_BOOTSTRAP_PEERS"); peers != "" {
-		config.Network.BootstrapPeers = strings.Split(peers, ",")
+	if v := os.Getenv("ALXNET_BOOTSTRAP_PEERS"); v != "" {
+		config.Network.BootstrapPeers = strings.Split(v, ",")
 	}
-
-	if maxPeers := os.Getenv("BETANET_MAX_PEERS"); maxPeers != "" {
-		if val, err := strconv.Atoi(maxPeers); err == nil {
+	if v := os.Getenv("ALXNET_MAX_PEERS"); v != "" {
+		if val, err := strconv.Atoi(v); err == nil {
 			config.Network.MaxPeers = val
 		}
 	}
-
-	if maxContent := os.Getenv("BETANET_MAX_CONTENT_SIZE"); maxContent != "" {
-		if val, err := strconv.ParseInt(maxContent, 10, 64); err == nil {
+	if v := os.Getenv("ALXNET_MAX_CONTENT_SIZE"); v != "" {
+		if val, err := strconv.ParseInt(v, 10, 64); err == nil {
 			config.Security.MaxContentSize = val
 		}
 	}
-
-	if dataDir := os.Getenv("BETANET_DATA_DIR"); dataDir != "" {
-		config.Storage.DataDir = dataDir
+	if v := os.Getenv("ALXNET_DATA_DIR"); v != "" {
+		config.Storage.DataDir = v
 	}
 
 	return config

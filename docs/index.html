@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AlxNet – Decentralized Multi‑File Website Publishing</title>
+  <meta name="description" content="AlxNet: a single hardened Go binary for decentralized multi‑file website publishing, browsing, wallet & node management over libp2p." />
+  <meta name="theme-color" content="#0d1117" />
+  <meta property="og:title" content="AlxNet" />
+  <meta property="og:description" content="Decentralized multi‑file website publishing & browsing in one self‑contained Go binary." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/browser-ui.png" />
+  <link rel="icon" type="image/png" href="assets/browser-ui.png" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header" id="top">
+    <div class="inner flex between center-y">
+      <div class="logo">🌐 <span>AlxNet</span></div>
+      <nav class="nav">
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#screens">Screens</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="#roadmap">Roadmap</a>
+        <a href="#cta" class="btn small primary">Get Notified</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero gradient">
+    <div class="inner hero-grid">
+      <div class="hero-copy">
+        <h1>Decentralized Multi‑File <span class="accent">Website Publishing</span><br/> in One Hardened Binary</h1>
+        <p class="tagline">Create, sign, publish & browse full websites (HTML / CSS / JS / images) over a cryptographically verifiable libp2p network. No docker compose. No sprawling micro‑services. Just <code>./bin/alxnet start</code>.</p>
+        <div class="cta-row">
+          <a href="#quickstart" class="btn primary large">Launch Locally</a>
+          <a href="#architecture" class="btn ghost large">How it Works →</a>
+        </div>
+        <p class="meta">Open source • Go 1.23+ • Content addressed • Ed25519 signatures • Canonical CBOR</p>
+      </div>
+      <div class="hero-media card float">
+        <img src="assets/browser-ui.png" alt="Browser UI" />
+        <div class="caption">Integrated Browser UI</div>
+      </div>
+    </div>
+    <div class="hero-waves" aria-hidden="true"></div>
+  </section>
+
+  <section id="features" class="section pad features">
+    <div class="inner">
+      <h2 class="center">Why AlxNet?</h2>
+      <p class="center lead">An opinionated stack designed for <strong>deterministic ownership</strong> and <strong>frictionless local-first publishing</strong>.</p>
+      <div class="feature-grid">
+        <div class="f card">
+          <h3>Single Binary</h3>
+          <p>One executable spins up browser, wallet & node dashboards plus the libp2p host. Reduced ops surface, fast iteration.</p>
+        </div>
+        <div class="f card">
+          <h3>Multi‑File Websites</h3>
+          <p>Publish full manifests: HTML, CSS, JS, images—linked via content CIDs inside a signed WebsiteManifest.</p>
+        </div>
+        <div class="f card">
+          <h3>Deterministic Keys</h3>
+          <p>BIP‑39 mnemonic → HKDF → site keys. Recover everything with just your phrase & labels.</p>
+        </div>
+        <div class="f card">
+          <h3>Cryptographic Integrity</h3>
+          <p>Ed25519 signatures + SHA‑256 addressing + canonical CBOR = tamper evident chains.</p>
+        </div>
+        <div class="f card">
+          <h3>Local Discovery</h3>
+          <p>mDNS instantly finds peers on the same network; add manual bootstrap for wider swarms.</p>
+        </div>
+        <div class="f card">
+          <h3>Wallet UX</h3>
+          <p>Manage sites, files, manifests & domain names (human‑readable labels) in a focused UI.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture" class="section alt pad">
+    <div class="inner narrow">
+      <h2 class="center">Architecture Snapshot</h2>
+      <p class="center lead">Layered for clarity: CLI orchestration, libp2p core, Badger storage, crypto model, web servers.</p>
+      <div class="arch-cards">
+        <div class="arch card">
+          <h3>CLI</h3>
+          <p>Entry point handles flags & lifecycle (<code>cmd/alxnet</code>).</p>
+        </div>
+        <div class="arch card">
+          <h3>P2P Core</h3>
+          <p>GossipSub topic <code>alxnet/updates/v1</code>, browse protocol, peer & rate limit scaffolding.</p>
+        </div>
+        <div class="arch card">
+          <h3>Storage</h3>
+          <p>BadgerDB keyed by content & manifest CIDs, domain registry, file records.</p>
+        </div>
+        <div class="arch card">
+          <h3>Crypto</h3>
+          <p>Deterministic derivation + dual signature (site & ephemeral update keys).</p>
+        </div>
+        <div class="arch card">
+          <h3>Web UIs</h3>
+          <p>Browser, Wallet, Node dashboards on separate ports for clarity & isolation.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="screens" class="section pad">
+    <div class="inner">
+      <h2 class="center">Interface Preview</h2>
+      <p class="center lead">Three focused surfaces for end‑to‑end publishing.</p>
+      <div class="screens-grid">
+        <figure class="shot card"><img src="assets/browser-ui.png" alt="Browser UI"/><figcaption>Browser UI</figcaption></figure>
+        <figure class="shot card"><img src="assets/wallet-ui.png" alt="Wallet UI"/><figcaption>Wallet UI</figcaption></figure>
+        <figure class="shot card"><img src="assets/node-ui.png" alt="Node UI"/><figcaption>Node UI</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="quickstart" class="section alt pad">
+    <div class="inner narrow">
+      <h2 class="center">Quick Start</h2>
+      <ol class="steps">
+        <li><strong>Clone & Build:</strong> <code>go mod tidy && ./build.sh</code></li>
+        <li><strong>Run:</strong> <code>./bin/alxnet start</code></li>
+        <li><strong>Create Wallet:</strong> Visit <code>http://localhost:8081</code></li>
+        <li><strong>Add Files & Publish:</strong> Build a manifest and broadcast.</li>
+        <li><strong>Browse:</strong> <code>http://localhost:8080/&lt;sitename&gt;</code></li>
+      </ol>
+      <p class="center note">Hardened build flags, tests & security audit baked into the build script.</p>
+    </div>
+  </section>
+
+  <section id="roadmap" class="section pad">
+    <div class="inner">
+      <h2 class="center">Roadmap Highlights</h2>
+      <div class="timeline">
+        <div class="t-item">
+          <div class="t-dot"></div>
+          <div class="t-content card">
+            <h3>Beta Launch (Now)</h3>
+            <p>Local publishing, deterministic sites, domain registry, multi‑file manifests, basic peer reputation scaffolding.</p>
+          </div>
+        </div>
+        <div class="t-item">
+          <div class="t-dot"></div>
+            <div class="t-content card">
+            <h3>Content Lifecycle</h3>
+            <p>LRU cleanup & configurable retention policies for content store.</p>
+          </div>
+        </div>
+        <div class="t-item">
+          <div class="t-dot"></div>
+          <div class="t-content card">
+            <h3>Domain Transfer Flow</h3>
+            <p>Cryptographic domain transfer proofs & ownership audits.</p>
+          </div>
+        </div>
+        <div class="t-item">
+          <div class="t-dot"></div>
+          <div class="t-content card">
+            <h3>Advanced Peer Scoring</h3>
+            <p>Expanded reputation metrics, ban logic & metrics exposure.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="cta" class="section gradient cta pad">
+    <div class="inner narrow center">
+      <h2>Visit Our GitHub</h2>
+      <p>Explore the source, follow development, file issues, and star the project to support decentralized multi‑file website publishing.</p>
+      <div class="cta-row" style="justify-content:center; margin-top:1.8rem;">
+  <a href="https://github.com/alxspiker/AlxNet" class="btn primary large" rel="noopener noreferrer">Open Repository →</a>
+  <a href="https://github.com/alxspiker/AlxNet/stargazers" class="btn ghost large" rel="noopener noreferrer">Star & Watch</a>
+      </div>
+      <p class="micro">MIT Licensed • Contributions Welcome</p>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="inner flex between center-y wrap">
+      <div class="foot-left">© <span id="year"></span> AlxNet. MIT Licensed.</div>
+      <div class="foot-links">
+        <a href="#top">Top</a>
+        <a href="#features">Features</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="#roadmap">Roadmap</a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
